@@ -18,6 +18,7 @@ import {
   Eye,
   TrendingDown,
   Lightbulb,
+  ArrowLeft,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -672,7 +673,7 @@ function AIHistoryTab({ aiHistory }: { aiHistory: AIRecommendationResult[] | nul
 // --- Main Component ---
 
 export default function CustomerDashboard() {
-  const { customerTab, setCustomerTab } = useAppStore();
+  const { customerTab, setCustomerTab, navigateTo } = useAppStore();
   const { token } = useAppStore();
   const [dashboardData, setDashboardData] = useState<{
     activeBookings: number;
@@ -706,9 +707,20 @@ export default function CustomerDashboard() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-2xl font-bold tracking-tight">Customer Dashboard</h2>
-        <p className="text-sm text-muted-foreground mt-1">Manage your bookings, reviews, and AI-powered recommendations</p>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div>
+          <h2 className="text-2xl font-bold tracking-tight">Customer Dashboard</h2>
+          <p className="text-sm text-muted-foreground mt-1">Manage your bookings, reviews, and AI-powered recommendations</p>
+        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => navigateTo("marketplace")}
+          className="gap-2 rounded-full self-start"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          Back to Marketplace
+        </Button>
       </div>
 
       <Tabs

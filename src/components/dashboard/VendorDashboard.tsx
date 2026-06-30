@@ -22,6 +22,7 @@ import {
   Loader2,
   AlertCircle,
   Image as ImageIcon,
+  ArrowLeft,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -886,7 +887,7 @@ function AnalyticsTab({ data }: { data: VendorDashboardData | null }) {
 // --- Main Component ---
 
 export default function VendorDashboard() {
-  const { vendorTab, setVendorTab, token } = useAppStore();
+  const { vendorTab, setVendorTab, token, navigateTo } = useAppStore();
   const [dashboardData, setDashboardData] = useState<VendorDashboardData | null>(null);
   const [products, setProducts] = useState<AppProduct[]>([]);
   const [vendorBookings, setVendorBookings] = useState<AppBooking[]>([]);
@@ -967,9 +968,20 @@ export default function VendorDashboard() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-2xl font-bold tracking-tight">Vendor Dashboard</h2>
-        <p className="text-sm text-muted-foreground mt-1">Manage your products, bookings, and track your business performance</p>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div>
+          <h2 className="text-2xl font-bold tracking-tight">Vendor Dashboard</h2>
+          <p className="text-sm text-muted-foreground mt-1">Manage your products, bookings, and track your business performance</p>
+        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => navigateTo("marketplace")}
+          className="gap-2 rounded-full self-start"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          Back to Marketplace
+        </Button>
       </div>
 
       <Tabs

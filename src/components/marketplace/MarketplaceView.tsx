@@ -8,7 +8,6 @@ import {
   Sparkles,
   X,
   PackageOpen,
-  ChevronDown,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -43,6 +42,10 @@ import { Label } from "@/components/ui/label";
 import { useAppStore } from "@/stores/app-store";
 import ProductCard, { ProductCardSkeleton } from "./ProductCard";
 import EventPlannerDialog from "./EventPlannerDialog";
+import HeroSection from "./HeroSection";
+import CategoriesShowcase from "./CategoriesShowcase";
+import HowItWorks from "./HowItWorks";
+import WhyRentWise from "./WhyRentWise";
 import type { AppProduct, AppCategory, ProductCondition, BookingType } from "@/lib/types";
 
 const ITEMS_PER_PAGE = 12;
@@ -89,7 +92,7 @@ export default function MarketplaceView() {
   // Event planner dialog
   const [eventPlannerOpen, setEventPlannerOpen] = useState(false);
 
-  // Listen for search events from Navbar
+  // Listen for search events from Navbar / Hero
   useEffect(() => {
     const handler = (e: Event) => {
       const customEvent = e as CustomEvent<string>;
@@ -97,9 +100,35 @@ export default function MarketplaceView() {
       setActiveSearch(query);
       setSearchQuery(query);
       setPage(1);
+      // Scroll to marketplace content
+      const el = document.getElementById("marketplace-content");
+      if (el) {
+        setTimeout(() => {
+          el.scrollIntoView({ behavior: "smooth", block: "start" });
+        }, 100);
+      }
     };
     window.addEventListener("marketplace-search", handler);
     return () => window.removeEventListener("marketplace-search", handler);
+  }, []);
+
+  // Listen for category filter events from CategoriesShowcase
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const customEvent = e as CustomEvent<string>;
+      const categoryId = customEvent.detail;
+      setSelectedCategory(categoryId);
+      setPage(1);
+      // Scroll to marketplace content
+      const el = document.getElementById("marketplace-content");
+      if (el) {
+        setTimeout(() => {
+          el.scrollIntoView({ behavior: "smooth", block: "start" });
+        }, 100);
+      }
+    };
+    window.addEventListener("marketplace-category-filter", handler);
+    return () => window.removeEventListener("marketplace-category-filter", handler);
   }, []);
 
   // Fetch categories
@@ -220,8 +249,8 @@ export default function MarketplaceView() {
           }}
         />
         <div className="flex justify-between text-xs text-muted-foreground">
-          <span>₹{priceRange[0].toLocaleString("en-IN")}</span>
-          <span>₹{priceRange[1].toLocaleString("en-IN")}</span>
+          <span>\u20B9{priceRange[0].toLocaleString("en-IN")}</span>
+          <span>\u20B9{priceRange[1].toLocaleString("en-IN")}</span>
         </div>
       </div>
 
@@ -294,13 +323,20 @@ export default function MarketplaceView() {
 
   return (
     <div className="flex-1">
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-6">
-        {/* Hero Header */}
+      {/* 1. Hero Section */}
+      <HeroSection />
+
+      {/* 2. Categories Showcase */}
+      <CategoriesShowcase />
+
+      {/* 3. Marketplace Content */}
+      <div id="marketplace-content" className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8 sm:py-10">
+        {/* Section Header + AI Event Planner */}
         <div className="mb-6">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div>
               <h2 className="text-2xl sm:text-3xl font-bold text-foreground">
-                Find Equipment
+                All Equipment
               </h2>
               <p className="text-sm text-muted-foreground mt-1">
                 Rent, buy, or book from verified vendors across India
@@ -601,6 +637,12 @@ export default function MarketplaceView() {
           </main>
         </div>
       </div>
+
+      {/* 4. How It Works */}
+      <HowItWorks />
+
+      {/* 5. Why RentWise */}
+      <WhyRentWise />
 
       {/* Event Planner Dialog */}
       <EventPlannerDialog open={eventPlannerOpen} onOpenChange={setEventPlannerOpen} />

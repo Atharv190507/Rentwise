@@ -25,6 +25,7 @@ import {
   Loader2,
   Mail,
   Phone,
+  ArrowLeft,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -912,7 +913,7 @@ function AdminBookingsTab() {
 // --- Main Component ---
 
 export default function AdminDashboard() {
-  const { adminTab, setAdminTab, token } = useAppStore();
+  const { adminTab, setAdminTab, token, navigateTo } = useAppStore();
   const [stats, setStats] = useState<AdminStats | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -937,9 +938,20 @@ export default function AdminDashboard() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-2xl font-bold tracking-tight">Admin Dashboard</h2>
-        <p className="text-sm text-muted-foreground mt-1">Platform management, user oversight, and system analytics</p>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div>
+          <h2 className="text-2xl font-bold tracking-tight">Admin Dashboard</h2>
+          <p className="text-sm text-muted-foreground mt-1">Platform management, user oversight, and system analytics</p>
+        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => navigateTo("marketplace")}
+          className="gap-2 rounded-full self-start"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          Back to Marketplace
+        </Button>
       </div>
 
       <Tabs

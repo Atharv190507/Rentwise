@@ -5,6 +5,7 @@ export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
     const category = searchParams.get("category");
+    const categoryId = searchParams.get("categoryId");
     const search = searchParams.get("search");
     const bookingType = searchParams.get("bookingType");
     const minPrice = searchParams.get("minPrice");
@@ -13,10 +14,13 @@ export async function GET(req: NextRequest) {
     const sort = searchParams.get("sort") || "newest";
     const page = parseInt(searchParams.get("page") || "1");
     const limit = parseInt(searchParams.get("limit") || "12");
+    const exclude = searchParams.get("exclude");
 
     const where: Record<string, unknown> = { status: "AVAILABLE" };
 
-    if (category) {
+    if (categoryId) {
+      where.categoryId = categoryId;
+    } else if (category) {
       const cat = await db.category.findUnique({ where: { slug: category } });
       if (cat) where.categoryId = cat.id;
     }
@@ -29,19 +33,19 @@ export async function GET(req: NextRequest) {
     if (condition) {
       where.condition = condition;
     }
-    if (bookingType === "RENT") {
-      where.rentPricePerDay = {};
-      if (minPrice) (where.rentPricePerDay as Record<string, unknown>).gte = parseFloat(minPrice);
-      if (maxPrice) (where.rentPricePerDay as Record<string, unknown>).lte = parseFloat(maxPrice);
-    } else if (bookingType === "BUY") {
-      where.buyPrice = {};
-      if (minPrice) (where.buyPrice as Record<string, unknown>).gte = parseFloat(minPrice);
-      if (maxPrice) (where.buyPrice as Record<string, unknown>).lte = parseFloat(maxPrice);
+    if (exclude) {
+      where.id = { not: exclude };
+    }
+    if (minPrice || maxPrice) {
+      const priceField = bookingType === "BUY" ? "buyPrice" : "rentPricePerDay";
+      (where as Record<string, unknown>)[priceField] = {};
+      if (minPrice) (where[priceField] as Record<string, unknown>).gte = parseFloat(minPrice);
+      if (maxPrice) (where[priceField] as Record<string, unknown>).lte = parseFloat(maxPrice);
     }
 
     const orderBy: Record<string, string> = {};
-    if (sort === "price-low") orderBy.rentPricePerDay = "asc";
-    else if (sort === "price-high") orderBy.rentPricePerDay = "desc";
+    if (sort === "price_low") orderBy.rentPricePerDay = "asc";
+    else if (sort === "price_high") orderBy.rentPricePerDay = "desc";
     else if (sort === "rating") orderBy.createdAt = "desc";
     else orderBy.createdAt = "desc";
 
