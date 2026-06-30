@@ -66,7 +66,10 @@ model Product {
   stock          Int      @default(1)
   status         String   @default("AVAILABLE") // AVAILABLE, UNAVAILABLE
   imageUrl       String?
+  images         String?  // JSON array of image paths, e.g. ["/uploads/products/abc.jpg"]
   condition      String   @default("NEW") // NEW, LIKE_NEW, GOOD, FAIR
+  listingTypes   String   @default("RENT,BOOK")
+  location       String?
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 

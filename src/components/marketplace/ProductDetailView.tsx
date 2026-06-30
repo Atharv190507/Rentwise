@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { motion } from "framer-motion";
 import {
   ArrowLeft,
@@ -15,6 +15,7 @@ import {
   Truck,
   RotateCcw,
   ChevronRight,
+  Store,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -86,6 +87,22 @@ export default function ProductDetailView() {
   const [loading, setLoading] = useState(true);
   const [bookingDialogOpen, setBookingDialogOpen] = useState(false);
   const [activeBookingType, setActiveBookingType] = useState<BookingType>("RENT");
+  const [selectedImageIndex, setSelectedImageIndex] = useState(0);
+
+  // Parse images from product
+  const productImages = useMemo(() => {
+    if (!product) return [];
+    if (product.images) {
+      try {
+        const parsed = JSON.parse(product.images);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      } catch { /* ignore */ }
+    }
+    if (product.imageUrl) return [product.imageUrl];
+    return [];
+  }, [product]);
+
+  const mainImage = productImages[selectedImageIndex] || null;
 
   useEffect(() => {
     if (!selectedProductId) {
@@ -95,6 +112,7 @@ export default function ProductDetailView() {
 
     const fetchProduct = async () => {
       setLoading(true);
+      setSelectedImageIndex(0);
       try {
         const res = await fetch(`/api/products/${selectedProductId}`);
         if (res.ok) {
@@ -122,37 +140,30 @@ export default function ProductDetailView() {
       }
     };
 
+    fetchProduct();
+    fetchReviews();
+
+    return undefined;
+  }, [selectedProductId, navigateTo]);
+
+  // Related Products - separate effect
+  useEffect(() => {
+    if (!product?.categoryId || !selectedProductId) return;
+    let cancelled = false;
     const fetchRelated = async () => {
-      if (!product?.categoryId) return;
       try {
         const res = await fetch(
           `/api/products?categoryId=${product.categoryId}&limit=4&exclude=${selectedProductId}`
         );
-        if (res.ok) {
+        if (res.ok && !cancelled) {
           const data = await res.json();
           setRelatedProducts(data.products || data || []);
         }
-      } catch {
-        // silently fail
-      }
+      } catch { /* silently fail */ }
     };
-
-    fetchProduct();
-    fetchReviews();
-
-    // Fetch related after product loads
-    const timer = setTimeout(fetchRelated, 500);
-    return () => clearTimeout(timer);
-  }, [selectedProductId, product?.categoryId, navigateTo]);
-
-  const openBooking = (type: BookingType) => {
-    if (!user) {
-      openAuthDialog("login");
-      return;
-    }
-    setActiveBookingType(type);
-    setBookingDialogOpen(true);
-  };
+    fetchRelated();
+    return () => { cancelled = true; };
+  }, [product?.categoryId, selectedProductId]);
 
   const handleActionClick = (type: BookingType) => {
     if (!user) {
@@ -245,28 +256,61 @@ export default function ProductDetailView() {
         >
           {/* Main Product Section */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12">
-            {/* Image */}
-            <div className="relative aspect-square rounded-2xl overflow-hidden bg-muted">
-              {product.imageUrl ? (
-                <img
-                  src={product.imageUrl}
-                  alt={product.title}
-                  className="h-full w-full object-cover"
-                />
-              ) : (
-                <div className="h-full w-full flex items-center justify-center">
-                  <Package className="h-20 w-20 text-muted-foreground/30" />
+            {/* Image Gallery */}
+            <div className="space-y-3">
+              <div className="relative aspect-square rounded-2xl overflow-hidden bg-muted">
+                {mainImage ? (
+                  <img
+                    src={mainImage}
+                    alt={product.title}
+                    className="h-full w-full object-cover"
+                  />
+                ) : (
+                  <div className="h-full w-full flex items-center justify-center">
+                    <Package className="h-20 w-20 text-muted-foreground/30" />
+                  </div>
+                )}
+
+                {/* Condition Badge */}
+                <div className="absolute top-4 right-4">
+                  <Badge
+                    className={`backdrop-blur-sm text-sm font-medium border-0 ${CONDITION_COLORS[product.condition]}`}
+                  >
+                    {CONDITION_LABELS[product.condition]}
+                  </Badge>
+                </div>
+
+                {/* Image counter */}
+                {productImages.length > 1 && (
+                  <div className="absolute bottom-4 left-4 px-2.5 py-1 rounded-full bg-black/60 text-white text-xs font-medium backdrop-blur-sm">
+                    {selectedImageIndex + 1} / {productImages.length}
+                  </div>
+                )}
+              </div>
+
+              {/* Thumbnail Strip */}
+              {productImages.length > 1 && (
+                <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
+                  {productImages.map((img, idx) => (
+                    <button
+                      key={idx}
+                      type="button"
+                      onClick={() => setSelectedImageIndex(idx)}
+                      className={`shrink-0 w-16 h-16 sm:w-20 sm:h-20 rounded-lg overflow-hidden border-2 transition-all ${
+                        idx === selectedImageIndex
+                          ? "border-primary ring-2 ring-primary/30"
+                          : "border-transparent opacity-60 hover:opacity-100"
+                      }`}
+                    >
+                      <img
+                        src={img}
+                        alt={`${product.title} ${idx + 1}`}
+                        className="h-full w-full object-cover"
+                      />
+                    </button>
+                  ))}
                 </div>
               )}
-
-              {/* Condition Badge */}
-              <div className="absolute top-4 right-4">
-                <Badge
-                  className={`backdrop-blur-sm text-sm font-medium border-0 ${CONDITION_COLORS[product.condition]}`}
-                >
-                  {CONDITION_LABELS[product.condition]}
-                </Badge>
-              </div>
             </div>
 
             {/* Product Info */}
@@ -279,7 +323,7 @@ export default function ProductDetailView() {
                 </span>
                 <ChevronRight className="h-3 w-3 text-muted-foreground" />
                 <span className="text-sm text-muted-foreground">
-                  {product.category.name}
+                  {product.title}
                 </span>
               </div>
 
@@ -379,29 +423,47 @@ export default function ProductDetailView() {
               </div>
 
               {/* Action Buttons */}
-              <div className="flex flex-col sm:flex-row gap-3 mb-6">
-                {(["RENT", "BUY", "BOOK"] as BookingType[]).map((type) => {
-                  const config = BOOKING_TYPE_CONFIG[type];
-                  const Icon = config.icon;
-                  return (
-                    <Button
-                      key={type}
-                      size="lg"
-                      className={`flex-1 gap-2 rounded-xl font-semibold ${config.color}`}
-                      onClick={() => handleActionClick(type)}
-                    >
-                      <Icon className="h-4 w-4" />
-                      {config.label}
-                    </Button>
-                  );
-                })}
-              </div>
+              {user?.role === "VENDOR" ? (
+                <div className="flex items-center gap-3 p-4 rounded-xl bg-muted/50 border border-dashed mb-6">
+                  <Store className="h-5 w-5 text-muted-foreground" />
+                  <div>
+                    <p className="text-sm font-medium">Vendor View</p>
+                    <p className="text-xs text-muted-foreground">Manage this product from your dashboard</p>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="ml-auto rounded-full"
+                    onClick={() => navigateTo("vendor-dashboard")}
+                  >
+                    Go to Dashboard
+                  </Button>
+                </div>
+              ) : (
+                <div className="flex flex-col sm:flex-row gap-3 mb-6">
+                  {(["RENT", "BUY", "BOOK"] as BookingType[]).map((type) => {
+                    const config = BOOKING_TYPE_CONFIG[type];
+                    const Icon = config.icon;
+                    return (
+                      <Button
+                        key={type}
+                        size="lg"
+                        className={`flex-1 gap-2 rounded-xl font-semibold ${config.color}`}
+                        onClick={() => handleActionClick(type)}
+                      >
+                        <Icon className="h-4 w-4" />
+                        {config.label}
+                      </Button>
+                    );
+                  })}
+                </div>
+              )}
 
               {/* Trust Badges */}
               <div className="grid grid-cols-3 gap-3">
                 {[
                   { icon: ShieldCheck, label: "Secure Payment" },
-                  { icon: Truck, label: " doorstep delivery" },
+                  { icon: Truck, label: "Doorstep Delivery" },
                   { icon: RotateCcw, label: "Easy Returns" },
                 ].map(({ icon: Icon, label }) => (
                   <div

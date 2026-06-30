@@ -14,6 +14,7 @@ import {
   LayoutDashboard,
   ChevronDown,
   Sparkles,
+  Plus,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -146,6 +147,22 @@ export default function Navbar() {
 
             {user && token ? (
               <>
+                {/* List Equipment Button (Vendors only) */}
+                {user.role === "VENDOR" && (
+                  <Button
+                    size="sm"
+                    onClick={() => {
+                      const { setVendorTab } = useAppStore.getState();
+                      setVendorTab("add-product");
+                      navigateTo("vendor-dashboard");
+                    }}
+                    className="hidden sm:flex rounded-full gap-1.5"
+                  >
+                    <Plus className="h-4 w-4" />
+                    List Equipment
+                  </Button>
+                )}
+
                 {/* User Menu */}
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>

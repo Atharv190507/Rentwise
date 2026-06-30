@@ -38,7 +38,26 @@ function DashboardLoader() {
 }
 
 export default function Home() {
-  const { currentView } = useAppStore();
+  const { currentView, setUser } = useAppStore();
+
+  useEffect(() => {
+    const token = localStorage.getItem("rw_token");
+    if (token) {
+      fetch("/api/auth/me", {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+        .then((res) => {
+          if (res.ok) return res.json();
+          throw new Error();
+        })
+        .then((user) => {
+          setUser(user, token);
+        })
+        .catch(() => {
+          localStorage.removeItem("rw_token");
+        });
+    }
+  }, [setUser]);
 
   return (
     <div className="min-h-screen flex flex-col">

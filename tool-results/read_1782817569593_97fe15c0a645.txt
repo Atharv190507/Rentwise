@@ -1,0 +1,1123 @@
+     1→"use client";
+     2→
+     3→import { useState, useEffect, useCallback } from "react";
+     4→import { motion, AnimatePresence } from "framer-motion";
+     5→import { toast } from "sonner";
+     6→import { useForm } from "react-hook-form";
+     7→import {
+     8→  Package,
+     9→  Calendar,
+    10→  DollarSign,
+    11→  Store,
+    12→  BarChart3,
+    13→  Star,
+    14→  TrendingUp,
+    15→  Clock,
+    16→  CheckCircle,
+    17→  XCircle,
+    18→  Plus,
+    19→  Eye,
+    20→  Sparkles,
+    21→  Users,
+    22→  Loader2,
+    23→  AlertCircle,
+    24→  Image as ImageIcon,
+    25→  ArrowLeft,
+    26→} from "lucide-react";
+    27→import { Button } from "@/components/ui/button";
+    28→import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+    29→import { Badge } from "@/components/ui/badge";
+    30→import { Input } from "@/components/ui/input";
+    31→import { Label } from "@/components/ui/label";
+    32→import { Textarea } from "@/components/ui/textarea";
+    33→import { Skeleton } from "@/components/ui/skeleton";
+    34→import { Separator } from "@/components/ui/separator";
+    35→import {
+    36→  Select,
+    37→  SelectContent,
+    38→  SelectItem,
+    39→  SelectTrigger,
+    40→  SelectValue,
+    41→} from "@/components/ui/select";
+    42→import {
+    43→  Table,
+    44→  TableBody,
+    45→  TableCell,
+    46→  TableHead,
+    47→  TableHeader,
+    48→  TableRow,
+    49→} from "@/components/ui/table";
+    50→import {
+    51→  Tabs,
+    52→  TabsContent,
+    53→  TabsList,
+    54→  TabsTrigger,
+    55→} from "@/components/ui/tabs";
+    56→import {
+    57→  BarChart,
+    58→  Bar,
+    59→  XAxis,
+    60→  YAxis,
+    61→  CartesianGrid,
+    62→  Tooltip,
+    63→  ResponsiveContainer,
+    64→} from "recharts";
+    65→import { useAppStore } from "@/stores/app-store";
+    66→import type {
+    67→  AppProduct,
+    68→  AppBooking,
+    69→  ProductCondition,
+    70→  BookingStatus,
+    71→} from "@/lib/types";
+    72→import { BOOKING_STATUS_COLORS, BOOKING_TYPE_COLORS } from "@/lib/types";
+    73→
+    74→const tabAnimation = {
+    75→  initial: { opacity: 0, y: 12 },
+    76→  animate: { opacity: 1, y: 0 },
+    77→  exit: { opacity: 0, y: -12 },
+    78→  transition: { duration: 0.25, ease: "easeOut" },
+    79→};
+    80→
+    81→function formatINR(amount: number) {
+    82→  return `₹${amount.toLocaleString("en-IN")}`;
+    83→}
+    84→
+    85→function formatDate(dateStr: string) {
+    86→  return new Date(dateStr).toLocaleDateString("en-IN", {
+    87→    day: "numeric",
+    88→    month: "short",
+    89→    year: "numeric",
+    90→  });
+    91→}
+    92→
+    93→// --- Skeletons ---
+    94→
+    95→function VendorOverviewSkeleton() {
+    96→  return (
+    97→    <div className="space-y-6">
+    98→      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+    99→        {[...Array(5)].map((_, i) => (
+   100→          <Card key={i} className="p-4">
+   101→            <div className="flex items-center gap-4">
+   102→              <Skeleton className="h-10 w-10 rounded-lg" />
+   103→              <div className="space-y-2 flex-1">
+   104→                <Skeleton className="h-5 w-16" />
+   105→                <Skeleton className="h-3 w-24" />
+   106→              </div>
+   107→            </div>
+   108→          </Card>
+   109→        ))}
+   110→      </div>
+   111→      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+   112→        <Card>
+   113→          <CardHeader className="pb-3"><Skeleton className="h-5 w-36" /></CardHeader>
+   114→          <CardContent>
+   115→            <div className="space-y-3">
+   116→              {[...Array(5)].map((_, i) => (
+   117→                <Skeleton key={i} className="h-10 w-full" />
+   118→              ))}
+   119→            </div>
+   120→          </CardContent>
+   121→        </Card>
+   122→        <Card>
+   123→          <CardHeader className="pb-3"><Skeleton className="h-5 w-36" /></CardHeader>
+   124→          <CardContent><Skeleton className="h-[200px] w-full" /></CardContent>
+   125→        </Card>
+   126→      </div>
+   127→      <Card>
+   128→        <CardHeader className="pb-3"><Skeleton className="h-5 w-36" /></CardHeader>
+   129→        <CardContent><Skeleton className="h-[250px] w-full" /></CardContent>
+   130→      </Card>
+   131→    </div>
+   132→  );
+   133→}
+   134→
+   135→function ProductsGridSkeleton() {
+   136→  return (
+   137→    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+   138→      {[...Array(6)].map((_, i) => (
+   139→        <Card key={i}>
+   140→          <Skeleton className="h-40 w-full rounded-t-lg" />
+   141→          <CardContent className="p-4 space-y-2">
+   142→            <Skeleton className="h-5 w-3/4" />
+   143→            <Skeleton className="h-4 w-1/2" />
+   144→            <div className="flex gap-2">
+   145→              <Skeleton className="h-6 w-16" />
+   146→              <Skeleton className="h-6 w-16" />
+   147→            </div>
+   148→          </CardContent>
+   149→        </Card>
+   150→      ))}
+   151→    </div>
+   152→  );
+   153→}
+   154→
+   155→function VendorBookingsSkeleton() {
+   156→  return (
+   157→    <div className="space-y-3">
+   158→      {[...Array(5)].map((_, i) => (
+   159→        <Card key={i}>
+   160→          <CardContent className="p-4">
+   161→            <div className="flex items-center gap-4">
+   162→              <Skeleton className="h-12 w-12 rounded-full" />
+   163→              <div className="flex-1 space-y-2">
+   164→                <Skeleton className="h-4 w-40" />
+   165→                <Skeleton className="h-3 w-56" />
+   166→              </div>
+   167→              <Skeleton className="h-8 w-20" />
+   168→            </div>
+   169→          </CardContent>
+   170→        </Card>
+   171→      ))}
+   172→    </div>
+   173→  );
+   174→}
+   175→
+   176→// --- Overview Tab ---
+   177→
+   178→interface VendorDashboardData {
+   179→  totalProducts: number;
+   180→  activeBookings: number;
+   181→  pendingApprovals: number;
+   182→  completedOrders: number;
+   183→  totalRevenue: number;
+   184→  recentBookings: AppBooking[];
+   185→  topProducts: Array<{ name: string; bookingCount: number }>;
+   186→  monthlyRevenue: Array<{ month: string; revenue: number }>;
+   187→}
+   188→
+   189→function VendorOverviewTab({ data }: { data: VendorDashboardData | null }) {
+   190→  if (!data) return <VendorOverviewSkeleton />;
+   191→
+   192→  const statCards = [
+   193→    { icon: <Package className="h-5 w-5" />, value: data.totalProducts, label: "Total Products", color: "text-primary", bg: "bg-primary/10" },
+   194→    { icon: <Calendar className="h-5 w-5" />, value: data.activeBookings, label: "Active Bookings", color: "text-emerald-600", bg: "bg-emerald-100 dark:bg-emerald-900/30" },
+   195→    { icon: <Clock className="h-5 w-5" />, value: data.pendingApprovals, label: "Pending Approvals", color: "text-amber-600", bg: "bg-amber-100 dark:bg-amber-900/30" },
+   196→    { icon: <CheckCircle className="h-5 w-5" />, value: data.completedOrders, label: "Completed Orders", color: "text-violet-600", bg: "bg-violet-100 dark:bg-violet-900/30" },
+   197→    { icon: <DollarSign className="h-5 w-5" />, value: formatINR(data.totalRevenue), label: "Total Revenue", color: "text-emerald-600 dark:text-emerald-400", bg: "bg-emerald-100 dark:bg-emerald-900/30" },
+   198→  ];
+   199→
+   200→  return (
+   201→    <motion.div {...tabAnimation} className="space-y-6">
+   202→      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+   203→        {statCards.map((card, i) => (
+   204→          <Card key={i} className="p-4 card-hover">
+   205→            <div className="flex items-center gap-4">
+   206→              <div className={`flex h-10 w-10 items-center justify-center rounded-lg ${card.bg} ${card.color}`}>
+   207→                {card.icon}
+   208→              </div>
+   209→              <div>
+   210→                <p className="text-2xl font-bold leading-tight">{card.value}</p>
+   211→                <p className="text-xs text-muted-foreground">{card.label}</p>
+   212→              </div>
+   213→            </div>
+   214→          </Card>
+   215→        ))}
+   216→      </div>
+   217→
+   218→      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+   219→        {/* Recent Bookings */}
+   220→        <Card>
+   221→          <CardHeader className="pb-3">
+   222→            <CardTitle className="text-base font-semibold">Recent Bookings</CardTitle>
+   223→          </CardHeader>
+   224→          <CardContent>
+   225→            {data.recentBookings.length === 0 ? (
+   226→              <p className="text-sm text-muted-foreground py-6 text-center">No bookings yet</p>
+   227→            ) : (
+   228→              <div className="overflow-x-auto">
+   229→                <Table>
+   230→                  <TableHeader>
+   231→                    <TableRow>
+   232→                      <TableHead>Customer</TableHead>
+   233→                      <TableHead>Product</TableHead>
+   234→                      <TableHead>Status</TableHead>
+   235→                      <TableHead className="text-right">Amount</TableHead>
+   236→                    </TableRow>
+   237→                  </TableHeader>
+   238→                  <TableBody>
+   239→                    {data.recentBookings.map((b) => (
+   240→                      <TableRow key={b.id}>
+   241→                        <TableCell className="font-medium text-sm">{b.user?.name || "—"}</TableCell>
+   242→                        <TableCell className="text-sm max-w-[140px] truncate">{b.product?.title || "—"}</TableCell>
+   243→                        <TableCell>
+   244→                          <span className={`inline-flex items-center rounded-md px-1.5 py-0.5 text-[10px] font-medium ${BOOKING_STATUS_COLORS[b.status]}`}>
+   245→                            {b.status}
+   246→                          </span>
+   247→                        </TableCell>
+   248→                        <TableCell className="text-right font-medium text-sm">{formatINR(b.totalPrice)}</TableCell>
+   249→                      </TableRow>
+   250→                    ))}
+   251→                  </TableBody>
+   252→                </Table>
+   253→              </div>
+   254→            )}
+   255→          </CardContent>
+   256→        </Card>
+   257→
+   258→        {/* Top Products */}
+   259→        <Card>
+   260→          <CardHeader className="pb-3">
+   261→            <CardTitle className="text-base font-semibold">Top Products</CardTitle>
+   262→          </CardHeader>
+   263→          <CardContent>
+   264→            {data.topProducts.length === 0 ? (
+   265→              <p className="text-sm text-muted-foreground py-6 text-center">No product data yet</p>
+   266→            ) : (
+   267→              <div className="space-y-3">
+   268→                {data.topProducts.map((p, i) => (
+   269→                  <div key={i} className="flex items-center justify-between">
+   270→                    <div className="flex items-center gap-3">
+   271→                      <span className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/10 text-primary text-xs font-bold">
+   272→                        {i + 1}
+   273→                      </span>
+   274→                      <span className="text-sm font-medium truncate max-w-[200px]">{p.name}</span>
+   275→                    </div>
+   276→                    <span className="text-sm text-muted-foreground">{p.bookingCount} bookings</span>
+   277→                  </div>
+   278→                ))}
+   279→              </div>
+   280→            )}
+   281→          </CardContent>
+   282→        </Card>
+   283→      </div>
+   284→
+   285→      {/* Monthly Revenue Chart */}
+   286→      {data.monthlyRevenue.length > 0 && (
+   287→        <Card>
+   288→          <CardHeader className="pb-3">
+   289→            <CardTitle className="text-base font-semibold">Monthly Revenue</CardTitle>
+   290→          </CardHeader>
+   291→          <CardContent>
+   292→            <div className="h-[250px] w-full">
+   293→              <ResponsiveContainer width="100%" height="100%">
+   294→                <BarChart data={data.monthlyRevenue}>
+   295→                  <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+   296→                  <XAxis dataKey="month" tick={{ fontSize: 12 }} className="fill-muted-foreground" />
+   297→                  <YAxis tick={{ fontSize: 12 }} className="fill-muted-foreground" />
+   298→                  <Tooltip
+   299→                    contentStyle={{
+   300→                      backgroundColor: "var(--popover)",
+   301→                      border: "1px solid var(--border)",
+   302→                      borderRadius: "var(--radius)",
+   303→                      color: "var(--popover-foreground)",
+   304→                    }}
+   305→                    formatter={(value: number) => [formatINR(value), "Revenue"]}
+   306→                  />
+   307→                  <Bar dataKey="revenue" fill="var(--primary)" radius={[4, 4, 0, 0]} />
+   308→                </BarChart>
+   309→              </ResponsiveContainer>
+   310→            </div>
+   311→          </CardContent>
+   312→        </Card>
+   313→      )}
+   314→    </motion.div>
+   315→  );
+   316→}
+   317→
+   318→// --- Products Tab ---
+   319→
+   320→function VendorProductsTab({ products, loading, onAddProduct }: {
+   321→  products: AppProduct[] | null;
+   322→  loading: boolean;
+   323→  onAddProduct: () => void;
+   324→}) {
+   325→  if (loading) return <ProductsGridSkeleton />;
+   326→
+   327→  if (!products || products.length === 0) {
+   328→    return (
+   329→      <motion.div {...tabAnimation} className="space-y-4">
+   330→        <div className="flex justify-end">
+   331→          <Button onClick={onAddProduct} size="sm">
+   332→            <Plus className="h-4 w-4 mr-1.5" />
+   333→            Add Product
+   334→          </Button>
+   335→        </div>
+   336→        <Card>
+   337→          <CardContent className="py-12 text-center">
+   338→            <Package className="h-10 w-10 mx-auto text-muted-foreground/40 mb-3" />
+   339→            <p className="text-sm text-muted-foreground">No products yet</p>
+   340→            <Button variant="outline" size="sm" onClick={onAddProduct} className="mt-3">
+   341→              <Plus className="h-4 w-4 mr-1.5" />
+   342→              Add Your First Product
+   343→            </Button>
+   344→          </CardContent>
+   345→        </Card>
+   346→      </motion.div>
+   347→    );
+   348→  }
+   349→
+   350→  return (
+   351→    <motion.div {...tabAnimation} className="space-y-4">
+   352→      <div className="flex justify-end">
+   353→        <Button onClick={onAddProduct} size="sm">
+   354→          <Plus className="h-4 w-4 mr-1.5" />
+   355→          Add Product
+   356→        </Button>
+   357→      </div>
+   358→      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+   359→        {products.map((p) => (
+   360→          <Card key={p.id} className="overflow-hidden card-hover">
+   361→            <div className="h-40 bg-muted relative">
+   362→              {p.imageUrl ? (
+   363→                <img src={p.imageUrl} alt={p.title} className="h-full w-full object-cover" />
+   364→              ) : (
+   365→                <div className="h-full w-full flex items-center justify-center">
+   366→                  <ImageIcon className="h-10 w-10 text-muted-foreground/30" />
+   367→                </div>
+   368→              )}
+   369→              <Badge
+   370→                className={`absolute top-2 right-2 text-[10px] ${
+   371→                  p.status === "AVAILABLE"
+   372→                    ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400"
+   373→                    : "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400"
+   374→                }`}
+   375→              >
+   376→                {p.status}
+   377→              </Badge>
+   378→            </div>
+   379→            <CardContent className="p-4 space-y-2">
+   380→              <h3 className="font-semibold text-sm truncate">{p.title}</h3>
+   381→              <p className="text-xs text-muted-foreground">{p.category?.name || "Uncategorized"}</p>
+   382→              <div className="flex items-center gap-3 text-xs text-muted-foreground">
+   383→                <span className="flex items-center gap-1">
+   384→                  <Package className="h-3 w-3" /> Stock: {p.stock}
+   385→                </span>
+   386→                <span className="flex items-center gap-1">
+   387→                  <Calendar className="h-3 w-3" /> {p._count?.reviews || 0} reviews
+   388→                </span>
+   389→              </div>
+   390→              <Separator />
+   391→              <div className="flex items-center justify-between">
+   392→                <div className="flex items-center gap-2 text-sm">
+   393→                  <span className="font-semibold text-emerald-600 dark:text-emerald-400">{formatINR(p.rentPricePerDay)}</span>
+   394→                  <span className="text-muted-foreground">/day</span>
+   395→                </div>
+   396→                <div className="flex items-center gap-1">
+   397→                  <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
+   398→                  <span className="text-xs font-medium">{p.avgRating?.toFixed(1) || "—"} </span>
+   399→                </div>
+   400→              </div>
+   401→            </CardContent>
+   402→          </Card>
+   403→        ))}
+   404→      </div>
+   405→    </motion.div>
+   406→  );
+   407→}
+   408→
+   409→// --- Add Product Tab ---
+   410→
+   411→interface ProductFormData {
+   412→  title: string;
+   413→  categoryId: string;
+   414→  description: string;
+   415→  features: string;
+   416→  buyPrice: string;
+   417→  rentPricePerDay: string;
+   418→  deposit: string;
+   419→  stock: string;
+   420→  condition: string;
+   421→  imageUrl: string;
+   422→  listingTypes: string;
+   423→  location: string;
+   424→}
+   425→
+   426→function AddProductTab({ categories, onSubmitted }: {
+   427→  categories: Array<{ id: string; name: string }> | null;
+   428→  onSubmitted: () => void;
+   429→}) {
+   430→  const { token } = useAppStore();
+   431→  const [aiLoading, setAiLoading] = useState(false);
+   432→  const [submitting, setSubmitting] = useState(false);
+   433→
+   434→  const {
+   435→    register,
+   436→    handleSubmit,
+   437→    setValue,
+   438→    watch,
+   439→    reset,
+   440→    formState: { errors },
+   441→  } = useForm<ProductFormData>();
+   442→
+   443→  const title = watch("title");
+   444→
+   445→  const handleAIGenerate = async () => {
+   446→    if (!title?.trim() || !token) return;
+   447→    setAiLoading(true);
+   448→    try {
+   449→      const res = await fetch("/api/ai/description", {
+   450→        method: "POST",
+   451→        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+   452→        body: JSON.stringify({ productName: title }),
+   453→      });
+   454→      if (!res.ok) throw new Error("AI generation failed");
+   455→      const data = await res.json();
+   456→      if (data.description) setValue("description", data.description);
+   457→      if (data.features) setValue("features", data.features);
+   458→      if (data.categoryId) setValue("categoryId", data.categoryId);
+   459→      toast.success("AI generated description successfully");
+   460→    } catch {
+   461→      toast.error("Failed to generate AI description");
+   462→    } finally {
+   463→      setAiLoading(false);
+   464→    }
+   465→  };
+   466→
+   467→  const onSubmit = async (formData: ProductFormData) => {
+   468→    if (!token) return;
+   469→    setSubmitting(true);
+   470→    try {
+   471→      const res = await fetch("/api/vendors/products", {
+   472→        method: "POST",
+   473→        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+   474→        body: JSON.stringify({
+   475→          ...formData,
+   476→          buyPrice: Number(formData.buyPrice),
+   477→          rentPricePerDay: Number(formData.rentPricePerDay),
+   478→          deposit: Number(formData.deposit),
+   479→          stock: Number(formData.stock),
+   480→          listingTypes: formData.listingTypes || "RENT,BOOK",
+   481→          location: formData.location || null,
+   482→        }),
+   483→      });
+   484→      if (!res.ok) throw new Error("Failed to add product");
+   485→      toast.success("Product added successfully!");
+   486→      reset();
+   487→      setValue("listingTypes", "RENT,BOOK");
+   488→      onSubmitted();
+   489→    } catch {
+   490→      toast.error("Failed to add product");
+   491→    } finally {
+   492→      setSubmitting(false);
+   493→    }
+   494→  };
+   495→
+   496→  return (
+   497→    <motion.div {...tabAnimation} className="max-w-2xl">
+   498→      <Card>
+   499→        <CardHeader>
+   500→          <CardTitle className="text-base">Add New Product</CardTitle>
+   501→        </CardHeader>
+   502→        <CardContent>
+   503→          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+   504→            {/* Title + AI */}
+   505→            <div className="space-y-2">
+   506→              <Label htmlFor="title">Product Title</Label>
+   507→              <div className="flex gap-2">
+   508→                <Input
+   509→                  id="title"
+   510→                  placeholder="e.g. Canon EOS R5 Camera"
+   511→                  {...register("title", { required: "Title is required" })}
+   512→                  className="flex-1"
+   513→                />
+   514→                <Button
+   515→                  type="button"
+   516→                  variant="outline"
+   517→                  size="sm"
+   518→                  onClick={handleAIGenerate}
+   519→                  disabled={aiLoading || !title?.trim()}
+   520→                  className="shrink-0"
+   521→                >
+   522→                  {aiLoading ? (
+   523→                    <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
+   524→                  ) : (
+   525→                    <Sparkles className="h-4 w-4 mr-1.5" />
+   526→                  )}
+   527→                  Generate with AI
+   528→                </Button>
+   529→              </div>
+   530→              {errors.title && <p className="text-xs text-destructive">{errors.title.message}</p>}
+   531→            </div>
+   532→
+   533→            {/* Category */}
+   534→            <div className="space-y-2">
+   535→              <Label>Category</Label>
+   536→              <Select onValueChange={(v) => setValue("categoryId", v)} defaultValue="">
+   537→                <SelectTrigger className="w-full">
+   538→                  <SelectValue placeholder="Select a category" />
+   539→                </SelectTrigger>
+   540→                <SelectContent>
+   541→                  {categories?.map((c) => (
+   542→                    <SelectItem key={c.id} value={c.id}>
+   543→                      {c.name}
+   544→                    </SelectItem>
+   545→                  ))}
+   546→                </SelectContent>
+   547→              </Select>
+   548→              <input type="hidden" {...register("categoryId", { required: "Category is required" })} />
+   549→              {errors.categoryId && <p className="text-xs text-destructive">{errors.categoryId.message}</p>}
+   550→            </div>
+   551→
+   552→            {/* Description */}
+   553→            <div className="space-y-2">
+   554→              <Label htmlFor="description">Description</Label>
+   555→              <Textarea
+   556→                id="description"
+   557→                placeholder="Describe the product..."
+   558→                rows={4}
+   559→                {...register("description", { required: "Description is required" })}
+   560→              />
+   561→              {errors.description && <p className="text-xs text-destructive">{errors.description.message}</p>}
+   562→            </div>
+   563→
+   564→            {/* Features */}
+   565→            <div className="space-y-2">
+   566→              <Label htmlFor="features">Features</Label>
+   567→              <Input
+   568→                id="features"
+   569→                placeholder="e.g. 4K Video, 45MP, WiFi, Bluetooth (comma separated)"
+   570→                {...register("features")}
+   571→              />
+   572→              <p className="text-xs text-muted-foreground">Separate features with commas</p>
+   573→            </div>
+   574→
+   575→            {/* Prices Row */}
+   576→            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+   577→              <div className="space-y-2">
+   578→                <Label htmlFor="buyPrice">Buy Price (₹)</Label>
+   579→                <Input
+   580→                  id="buyPrice"
+   581→                  type="number"
+   582→                  placeholder="0"
+   583→                  {...register("buyPrice", { required: "Required" })}
+   584→                />
+   585→                {errors.buyPrice && <p className="text-xs text-destructive">{errors.buyPrice.message}</p>}
+   586→              </div>
+   587→              <div className="space-y-2">
+   588→                <Label htmlFor="rentPricePerDay">Rent Price / Day (₹)</Label>
+   589→                <Input
+   590→                  id="rentPricePerDay"
+   591→                  type="number"
+   592→                  placeholder="0"
+   593→                  {...register("rentPricePerDay", { required: "Required" })}
+   594→                />
+   595→                {errors.rentPricePerDay && <p className="text-xs text-destructive">{errors.rentPricePerDay.message}</p>}
+   596→              </div>
+   597→              <div className="space-y-2">
+   598→                <Label htmlFor="deposit">Deposit (₹)</Label>
+   599→                <Input
+   600→                  id="deposit"
+   601→                  type="number"
+   602→                  placeholder="0"
+   603→                  {...register("deposit", { required: "Required" })}
+   604→                />
+   605→                {errors.deposit && <p className="text-xs text-destructive">{errors.deposit.message}</p>}
+   606→              </div>
+   607→            </div>
+   608→
+   609→            {/* Stock + Condition */}
+   610→            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+   611→              <div className="space-y-2">
+   612→                <Label htmlFor="stock">Stock Quantity</Label>
+   613→                <Input
+   614→                  id="stock"
+   615→                  type="number"
+   616→                  placeholder="1"
+   617→                  {...register("stock", { required: "Required", valueAsNumber: true })}
+   618→                />
+   619→                {errors.stock && <p className="text-xs text-destructive">{errors.stock.message}</p>}
+   620→              </div>
+   621→              <div className="space-y-2">
+   622→                <Label>Condition</Label>
+   623→                <Select onValueChange={(v) => setValue("condition", v)} defaultValue="">
+   624→                  <SelectTrigger className="w-full">
+   625→                    <SelectValue placeholder="Select condition" />
+   626→                  </SelectTrigger>
+   627→                  <SelectContent>
+   628→                    <SelectItem value="NEW">New</SelectItem>
+   629→                    <SelectItem value="LIKE_NEW">Like New</SelectItem>
+   630→                    <SelectItem value="GOOD">Good</SelectItem>
+   631→                    <SelectItem value="FAIR">Fair</SelectItem>
+   632→                  </SelectContent>
+   633→                </Select>
+   634→                <input type="hidden" {...register("condition", { required: "Condition is required" })} />
+   635→                {errors.condition && <p className="text-xs text-destructive">{errors.condition.message}</p>}
+   636→              </div>
+   637→            </div>
+   638→
+   639→            {/* Image URL */}
+   640→            <div className="space-y-2">
+   641→              <Label htmlFor="imageUrl">Image URL (optional)</Label>
+   642→              <div className="flex items-center gap-2">
+   643→                <ImageIcon className="h-4 w-4 text-muted-foreground shrink-0" />
+   644→                <Input
+   645→                  id="imageUrl"
+   646→                  placeholder="https://example.com/product-image.jpg"
+   647→                  {...register("imageUrl")}
+   648→                />
+   649→              </div>
+   650→              <p className="text-xs text-muted-foreground">Add a product image URL for better visibility</p>
+   651→            </div>
+   652→
+   653→            {/* Listing Types */}
+   654→            <div className="space-y-2">
+   655→              <Label>Available For</Label>
+   656→              <div className="grid grid-cols-3 gap-3">
+   657→                {[
+   658→                  { value: "RENT", label: "Rent", icon: "🔄", desc: "Daily/weekly rental" },
+   659→                  { value: "BUY", label: "Sell", icon: "💰", desc: "One-time purchase" },
+   660→                  { value: "BOOK", label: "Book", icon: "📅", desc: "Date-based booking" },
+   661→                ].map((type) => (
+   662→                  <label
+   663→                    key={type.value}
+   664→                    className="flex flex-col items-center gap-1.5 p-3 rounded-lg border cursor-pointer has-[:checked]:border-primary has-[:checked]:bg-primary/5 transition-colors"
+   665→                  >
+   666→                    <input
+   667→                      type="checkbox"
+   668→                      value={type.value}
+   669→                      className="sr-only"
+   670→                      onChange={(e) => {
+   671→                        const current = watch("listingTypes") || "";
+   672→                        const types = current ? current.split(",") : [];
+   673→                        if (e.target.checked) {
+   674→                          if (!types.includes(type.value)) types.push(type.value);
+   675→                        } else {
+   676→                          const idx = types.indexOf(type.value);
+   677→                          if (idx > -1) types.splice(idx, 1);
+   678→                        }
+   679→                        setValue("listingTypes", types.join(","));
+   680→                      }}
+   681→                      defaultChecked={["RENT", "BOOK"].includes(type.value)}
+   682→                    />
+   683→                    <span className="text-lg">{type.icon}</span>
+   684→                    <span className="text-xs font-medium">{type.label}</span>
+   685→                    <span className="text-[10px] text-muted-foreground text-center">{type.desc}</span>
+   686→                  </label>
+   687→                ))}
+   688→              </div>
+   689→              <input type="hidden" {...register("listingTypes")} />
+   690→            </div>
+   691→
+   692→            {/* Location */}
+   693→            <div className="space-y-2">
+   694→              <Label htmlFor="location">Location / City</Label>
+   695→              <Input
+   696→                id="location"
+   697→                placeholder="e.g. Bengaluru, Mumbai, Delhi"
+   698→                {...register("location")}
+   699→              />
+   700→              <p className="text-xs text-muted-foreground">Where is this equipment available?</p>
+   701→            </div>
+   702→
+   703→            <Button type="submit" className="w-full" disabled={submitting}>
+   704→              {submitting ? (
+   705→                <>
+   706→                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+   707→                  Adding Product...
+   708→                </>
+   709→              ) : (
+   710→                <>
+   711→                  <Plus className="h-4 w-4 mr-2" />
+   712→                  Add Product
+   713→                </>
+   714→              )}
+   715→            </Button>
+   716→          </form>
+   717→        </CardContent>
+   718→      </Card>
+   719→    </motion.div>
+   720→  );
+   721→}
+   722→
+   723→// --- Bookings Tab ---
+   724→
+   725→function VendorBookingsTab({ bookings, loading, onAction }: {
+   726→  bookings: AppBooking[] | null;
+   727→  loading: boolean;
+   728→  onAction: () => void;
+   729→}) {
+   730→  const { token } = useAppStore();
+   731→
+   732→  const handleStatusUpdate = async (bookingId: string, status: BookingStatus) => {
+   733→    if (!token) return;
+   734→    try {
+   735→      const res = await fetch(`/api/bookings/${bookingId}`, {
+   736→        method: "PUT",
+   737→        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+   738→        body: JSON.stringify({ status }),
+   739→      });
+   740→      if (!res.ok) throw new Error("Failed to update booking");
+   741→      toast.success(`Booking ${status.toLowerCase()} successfully`);
+   742→      onAction();
+   743→    } catch {
+   744→      toast.error("Failed to update booking status");
+   745→    }
+   746→  };
+   747→
+   748→  if (loading) return <VendorBookingsSkeleton />;
+   749→
+   750→  if (!bookings || bookings.length === 0) {
+   751→    return (
+   752→      <motion.div {...tabAnimation}>
+   753→        <Card>
+   754→          <CardContent className="py-12 text-center">
+   755→            <Calendar className="h-10 w-10 mx-auto text-muted-foreground/40 mb-3" />
+   756→            <p className="text-sm text-muted-foreground">No bookings for your products yet</p>
+   757→          </CardContent>
+   758→        </Card>
+   759→      </motion.div>
+   760→    );
+   761→  }
+   762→
+   763→  return (
+   764→    <motion.div {...tabAnimation} className="space-y-3">
+   765→      {bookings.map((b) => (
+   766→        <Card key={b.id} className="card-hover">
+   767→          <CardContent className="p-4">
+   768→            <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+   769→              {/* Customer Info */}
+   770→              <div className="flex items-center gap-3 flex-1 min-w-0">
+   771→                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-primary text-sm font-bold shrink-0">
+   772→                  {b.user?.name?.charAt(0)?.toUpperCase() || "?"}
+   773→                </div>
+   774→                <div className="min-w-0">
+   775→                  <p className="font-medium text-sm truncate">{b.user?.name || "—"}</p>
+   776→                  <p className="text-xs text-muted-foreground truncate">{b.user?.email || "—"}</p>
+   777→                </div>
+   778→              </div>
+   779→
+   780→              {/* Booking Info */}
+   781→              <div className="flex-1 min-w-0">
+   782→                <p className="text-sm font-medium truncate">{b.product?.title || "—"}</p>
+   783→                <div className="flex items-center gap-2 mt-0.5">
+   784→                  <span className={`inline-flex items-center rounded-md px-1.5 py-0.5 text-[10px] font-medium ${BOOKING_TYPE_COLORS[b.bookingType]}`}>
+   785→                    {b.bookingType}
+   786→                  </span>
+   787→                  <span className="text-xs text-muted-foreground">
+   788→                    {b.startDate && b.endDate
+   789→                      ? `${formatDate(b.startDate)} – ${formatDate(b.endDate)}`
+   790→                      : "—"}
+   791→                  </span>
+   792→                  <span className="text-xs text-muted-foreground">×{b.quantity}</span>
+   793→                </div>
+   794→              </div>
+   795→
+   796→              {/* Amount & Status */}
+   797→              <div className="flex items-center gap-3 shrink-0">
+   798→                <div className="text-right">
+   799→                  <p className="font-semibold text-sm">{formatINR(b.totalPrice)}</p>
+   800→                  <span className={`inline-flex items-center rounded-md px-1.5 py-0.5 text-[10px] font-medium ${BOOKING_STATUS_COLORS[b.status]}`}>
+   801→                    {b.status}
+   802→                  </span>
+   803→                </div>
+   804→                {b.status === "PENDING" && (
+   805→                  <div className="flex gap-1.5">
+   806→                    <Button
+   807→                      size="sm"
+   808→                      variant="outline"
+   809→                      className="h-7 text-xs text-emerald-600 border-emerald-300 hover:bg-emerald-50 dark:text-emerald-400 dark:border-emerald-800 dark:hover:bg-emerald-900/20"
+   810→                      onClick={() => handleStatusUpdate(b.id, "APPROVED")}
+   811→                    >
+   812→                      <CheckCircle className="h-3 w-3 mr-1" />
+   813→                      Approve
+   814→                    </Button>
+   815→                    <Button
+   816→                      size="sm"
+   817→                      variant="outline"
+   818→                      className="h-7 text-xs text-red-600 border-red-300 hover:bg-red-50 dark:text-red-400 dark:border-red-800 dark:hover:bg-red-900/20"
+   819→                      onClick={() => handleStatusUpdate(b.id, "REJECTED")}
+   820→                    >
+   821→                      <XCircle className="h-3 w-3 mr-1" />
+   822→                      Reject
+   823→                    </Button>
+   824→                  </div>
+   825→                )}
+   826→              </div>
+   827→            </div>
+   828→          </CardContent>
+   829→        </Card>
+   830→      ))}
+   831→    </motion.div>
+   832→  );
+   833→}
+   834→
+   835→// --- Analytics Tab ---
+   836→
+   837→function AnalyticsTab({ data }: { data: VendorDashboardData | null }) {
+   838→  if (!data) return <VendorOverviewSkeleton />;
+   839→
+   840→  const bookingTypes = [
+   841→    { type: "RENT", count: data.recentBookings.filter((b) => b.bookingType === "RENT").length, color: "#059669" },
+   842→    { type: "BUY", count: data.recentBookings.filter((b) => b.bookingType === "BUY").length, color: "#7c3aed" },
+   843→    { type: "BOOK", count: data.recentBookings.filter((b) => b.bookingType === "BOOK").length, color: "#d97706" },
+   844→  ].filter((t) => t.count > 0);
+   845→
+   846→  const maxBookings = Math.max(...bookingTypes.map((t) => t.count), 1);
+   847→
+   848→  return (
+   849→    <motion.div {...tabAnimation} className="space-y-6">
+   850→      {/* Revenue Chart */}
+   851→      {data.monthlyRevenue.length > 0 && (
+   852→        <Card>
+   853→          <CardHeader className="pb-3">
+   854→            <CardTitle className="text-base font-semibold">Revenue Overview</CardTitle>
+   855→          </CardHeader>
+   856→          <CardContent>
+   857→            <div className="h-[300px] w-full">
+   858→              <ResponsiveContainer width="100%" height="100%">
+   859→                <BarChart data={data.monthlyRevenue}>
+   860→                  <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+   861→                  <XAxis dataKey="month" tick={{ fontSize: 12 }} className="fill-muted-foreground" />
+   862→                  <YAxis tick={{ fontSize: 12 }} className="fill-muted-foreground" />
+   863→                  <Tooltip
+   864→                    contentStyle={{
+   865→                      backgroundColor: "var(--popover)",
+   866→                      border: "1px solid var(--border)",
+   867→                      borderRadius: "var(--radius)",
+   868→                      color: "var(--popover-foreground)",
+   869→                    }}
+   870→                    formatter={(value: number) => [formatINR(value), "Revenue"]}
+   871→                  />
+   872→                  <Bar dataKey="revenue" fill="var(--primary)" radius={[4, 4, 0, 0]} />
+   873→                </BarChart>
+   874→              </ResponsiveContainer>
+   875→            </div>
+   876→          </CardContent>
+   877→        </Card>
+   878→      )}
+   879→
+   880→      {/* Stats Summary + Booking Type Distribution */}
+   881→      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+   882→        {/* Stats Summary */}
+   883→        <Card>
+   884→          <CardHeader className="pb-3">
+   885→            <CardTitle className="text-base font-semibold">Stats Summary</CardTitle>
+   886→          </CardHeader>
+   887→          <CardContent className="space-y-4">
+   888→            <div className="flex items-center justify-between">
+   889→              <span className="text-sm text-muted-foreground">Total Revenue</span>
+   890→              <span className="text-lg font-bold">{formatINR(data.totalRevenue)}</span>
+   891→            </div>
+   892→            <Separator />
+   893→            <div className="flex items-center justify-between">
+   894→              <span className="text-sm text-muted-foreground">Completed Orders</span>
+   895→              <span className="font-semibold">{data.completedOrders}</span>
+   896→            </div>
+   897→            <Separator />
+   898→            <div className="flex items-center justify-between">
+   899→              <span className="text-sm text-muted-foreground">Average Order Value</span>
+   900→              <span className="font-semibold">
+   901→                {data.completedOrders > 0
+   902→                  ? formatINR(Math.round(data.totalRevenue / data.completedOrders))
+   903→                  : "—"}
+   904→              </span>
+   905→            </div>
+   906→            <Separator />
+   907→            <div className="flex items-center justify-between">
+   908→              <span className="text-sm text-muted-foreground">Active Bookings</span>
+   909→              <span className="font-semibold">{data.activeBookings}</span>
+   910→            </div>
+   911→            <Separator />
+   912→            <div className="flex items-center justify-between">
+   913→              <span className="text-sm text-muted-foreground">Total Products</span>
+   914→              <span className="font-semibold">{data.totalProducts}</span>
+   915→            </div>
+   916→          </CardContent>
+   917→        </Card>
+   918→
+   919→        {/* Booking Type Distribution */}
+   920→        <Card>
+   921→          <CardHeader className="pb-3">
+   922→            <CardTitle className="text-base font-semibold">Booking Type Distribution</CardTitle>
+   923→          </CardHeader>
+   924→          <CardContent>
+   925→            {bookingTypes.length === 0 ? (
+   926→              <p className="text-sm text-muted-foreground py-6 text-center">No booking data yet</p>
+   927→            ) : (
+   928→              <div className="space-y-4 pt-2">
+   929→                {bookingTypes.map((t) => (
+   930→                  <div key={t.type} className="space-y-1.5">
+   931→                    <div className="flex items-center justify-between text-sm">
+   932→                      <span className={`font-medium ${BOOKING_TYPE_COLORS[t.type as keyof typeof BOOKING_TYPE_COLORS]} inline-flex items-center rounded-md px-2 py-0.5 text-[11px]`}>
+   933→                        {t.type}
+   934→                      </span>
+   935→                      <span className="text-muted-foreground">{t.count} bookings</span>
+   936→                    </div>
+   937→                    <div className="h-3 w-full rounded-full bg-muted overflow-hidden">
+   938→                      <motion.div
+   939→                        initial={{ width: 0 }}
+   940→                        animate={{ width: `${(t.count / maxBookings) * 100}%` }}
+   941→                        transition={{ duration: 0.6, ease: "easeOut" }}
+   942→                        className="h-full rounded-full"
+   943→                        style={{ backgroundColor: t.color }}
+   944→                      />
+   945→                    </div>
+   946→                  </div>
+   947→                ))}
+   948→              </div>
+   949→            )}
+   950→          </CardContent>
+   951→        </Card>
+   952→      </div>
+   953→    </motion.div>
+   954→  );
+   955→}
+   956→
+   957→// --- Main Component ---
+   958→
+   959→export default function VendorDashboard() {
+   960→  const { vendorTab, setVendorTab, token, navigateTo } = useAppStore();
+   961→  const [dashboardData, setDashboardData] = useState<VendorDashboardData | null>(null);
+   962→  const [products, setProducts] = useState<AppProduct[]>([]);
+   963→  const [vendorBookings, setVendorBookings] = useState<AppBooking[]>([]);
+   964→  const [categories, setCategories] = useState<Array<{ id: string; name: string }>>([]);
+   965→  const [loading, setLoading] = useState(true);
+   966→  const [productsLoading, setProductsLoading] = useState(false);
+   967→  const [bookingsLoading, setBookingsLoading] = useState(false);
+   968→
+   969→  const fetchDashboard = useCallback(async () => {
+   970→    if (!token) return;
+   971→    setLoading(true);
+   972→    try {
+   973→      const res = await fetch("/api/vendors/dashboard", {
+   974→        headers: { Authorization: `Bearer ${token}` },
+   975→      });
+   976→      if (!res.ok) throw new Error("Failed to fetch dashboard");
+   977→      const data = await res.json();
+   978→      setDashboardData(data);
+   979→    } catch {
+   980→      toast.error("Failed to load dashboard data");
+   981→    } finally {
+   982→      setLoading(false);
+   983→    }
+   984→  }, [token]);
+   985→
+   986→  const fetchProducts = useCallback(async () => {
+   987→    if (!token) return;
+   988→    setProductsLoading(true);
+   989→    try {
+   990→      const res = await fetch("/api/vendors/products", {
+   991→        headers: { Authorization: `Bearer ${token}` },
+   992→      });
+   993→      if (!res.ok) throw new Error("Failed to fetch products");
+   994→      const data = await res.json();
+   995→      setProducts(data.products || data || []);
+   996→    } catch {
+   997→      toast.error("Failed to load products");
+   998→    } finally {
+   999→      setProductsLoading(false);
+  1000→    }
+  1001→  }, [token]);
+  1002→
+  1003→  const fetchBookings = useCallback(async () => {
+  1004→    if (!token) return;
+  1005→    setBookingsLoading(true);
+  1006→    try {
+  1007→      const res = await fetch("/api/vendors/bookings", {
+  1008→        headers: { Authorization: `Bearer ${token}` },
+  1009→      });
+  1010→      if (!res.ok) throw new Error("Failed to fetch bookings");
+  1011→      const data = await res.json();
+  1012→      setVendorBookings(data.bookings || data || []);
+  1013→    } catch {
+  1014→      toast.error("Failed to load bookings");
+  1015→    } finally {
+  1016→      setBookingsLoading(false);
+  1017→    }
+  1018→  }, [token]);
+  1019→
+  1020→  useEffect(() => {
+  1021→    fetchDashboard();
+  1022→    // Also fetch categories for add-product form
+  1023→    fetch("/api/categories")
+  1024→      .then((r) => r.json())
+  1025→      .then((data) => setCategories(Array.isArray(data) ? data : data.categories || []))
+  1026→      .catch(() => {});
+  1027→  }, [fetchDashboard]);
+  1028→
+  1029→  useEffect(() => {
+  1030→    if (vendorTab === "products") fetchProducts();
+  1031→    if (vendorTab === "bookings") fetchBookings();
+  1032→  }, [vendorTab, fetchProducts, fetchBookings]);
+  1033→
+  1034→  const handleProductSubmitted = () => {
+  1035→    setVendorTab("products");
+  1036→    fetchProducts();
+  1037→  };
+  1038→
+  1039→  return (
+  1040→    <div className="space-y-6">
+  1041→      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+  1042→        <div>
+  1043→          <h2 className="text-2xl font-bold tracking-tight">Vendor Dashboard</h2>
+  1044→          <p className="text-sm text-muted-foreground mt-1">Manage your products, bookings, and track your business performance</p>
+  1045→        </div>
+  1046→        <Button
+  1047→          variant="outline"
+  1048→          size="sm"
+  1049→          onClick={() => navigateTo("marketplace")}
+  1050→          className="gap-2 rounded-full self-start"
+  1051→        >
+  1052→          <ArrowLeft className="h-4 w-4" />
+  1053→          Back to Marketplace
+  1054→        </Button>
+  1055→      </div>
+  1056→
+  1057→      <Tabs
+  1058→        value={vendorTab}
+  1059→        onValueChange={(v) => setVendorTab(v as typeof vendorTab)}
+  1060→        className="w-full"
+  1061→      >
+  1062→        <TabsList className="flex-wrap h-auto gap-1 p-1">
+  1063→          <TabsTrigger value="overview" className="text-xs sm:text-sm">
+  1064→            <Eye className="h-3.5 w-3.5 sm:mr-1.5" />
+  1065→            <span className="hidden sm:inline">Overview</span>
+  1066→          </TabsTrigger>
+  1067→          <TabsTrigger value="products" className="text-xs sm:text-sm">
+  1068→            <Package className="h-3.5 w-3.5 sm:mr-1.5" />
+  1069→            <span className="hidden sm:inline">Products</span>
+  1070→          </TabsTrigger>
+  1071→          <TabsTrigger value="bookings" className="text-xs sm:text-sm">
+  1072→            <Calendar className="h-3.5 w-3.5 sm:mr-1.5" />
+  1073→            <span className="hidden sm:inline">Bookings</span>
+  1074→          </TabsTrigger>
+  1075→          <TabsTrigger value="add-product" className="text-xs sm:text-sm">
+  1076→            <Plus className="h-3.5 w-3.5 sm:mr-1.5" />
+  1077→            <span className="hidden sm:inline">Add Product</span>
+  1078→          </TabsTrigger>
+  1079→          <TabsTrigger value="analytics" className="text-xs sm:text-sm">
+  1080→            <BarChart3 className="h-3.5 w-3.5 sm:mr-1.5" />
+  1081→            <span className="hidden sm:inline">Analytics</span>
+  1082→          </TabsTrigger>
+  1083→        </TabsList>
+  1084→
+  1085→        <AnimatePresence mode="wait">
+  1086→          {vendorTab === "overview" && (
+  1087→            <TabsContent value="overview">
+  1088→              <VendorOverviewTab data={loading ? null : dashboardData} />
+  1089→            </TabsContent>
+  1090→          )}
+  1091→          {vendorTab === "products" && (
+  1092→            <TabsContent value="products">
+  1093→              <VendorProductsTab
+  1094→                products={productsLoading ? null : products}
+  1095→                loading={productsLoading}
+  1096→                onAddProduct={() => setVendorTab("add-product")}
+  1097→              />
+  1098→            </TabsContent>
+  1099→          )}
+  1100→          {vendorTab === "bookings" && (
+  1101→            <TabsContent value="bookings">
+  1102→              <VendorBookingsTab
+  1103→                bookings={bookingsLoading ? null : vendorBookings}
+  1104→                loading={bookingsLoading}
+  1105→                onAction={fetchBookings}
+  1106→              />
+  1107→            </TabsContent>
+  1108→          )}
+  1109→          {vendorTab === "add-product" && (
+  1110→            <TabsContent value="add-product">
+  1111→              <AddProductTab categories={categories} onSubmitted={handleProductSubmitted} />
+  1112→            </TabsContent>
+  1113→          )}
+  1114→          {vendorTab === "analytics" && (
+  1115→            <TabsContent value="analytics">
+  1116→              <AnalyticsTab data={loading ? null : dashboardData} />
+  1117→            </TabsContent>
+  1118→          )}
+  1119→        </AnimatePresence>
+  1120→      </Tabs>
+  1121→    </div>
+  1122→  );
+  1123→}

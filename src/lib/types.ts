@@ -70,7 +70,10 @@ export interface AppProduct {
   stock: number;
   status: ProductStatus;
   imageUrl?: string;
+  images?: string; // JSON array of image paths
   condition: ProductCondition;
+  listingTypes?: string;
+  location?: string | null;
   vendor: { id: string; businessName: string; isVerified: boolean };
   category: { id: string; name: string; icon: string };
   _count?: { reviews: number };
@@ -134,7 +137,7 @@ export type AppView =
 
 export interface DashboardTab {
   customer: "overview" | "bookings" | "reviews" | "ai-history";
-  vendor: "overview" | "products" | "bookings" | "add-product" | "analytics";
+  vendor: "overview" | "products" | "bookings" | "add-product" | "edit-product" | "analytics";
   admin: "overview" | "users" | "vendors" | "products" | "bookings";
 }
 

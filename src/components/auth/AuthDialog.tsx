@@ -260,55 +260,6 @@ export default function AuthDialog() {
                       Register
                     </button>
                   </div>
-
-                  {/* Quick Demo Login */}
-                  <div className="pt-2">
-                    <div className="relative">
-                      <div className="absolute inset-0 flex items-center">
-                        <span className="w-full border-t" />
-                      </div>
-                      <div className="relative flex justify-center text-xs">
-                        <span className="bg-background px-3 text-muted-foreground">
-                          Quick Demo Login
-                        </span>
-                      </div>
-                    </div>
-                    <div className="flex gap-2 mt-3">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          loginForm.setValue("email", "arjun.sharma@email.com");
-                          loginForm.setValue("password", "customer123");
-                          loginForm.handleSubmit(handleLogin)();
-                        }}
-                        className="flex-1 rounded-full border border-border/60 px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground hover:bg-accent transition-premium"
-                      >
-                        Try as Customer
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          loginForm.setValue("email", "progear@rentwise.ai");
-                          loginForm.setValue("password", "vendor123");
-                          loginForm.handleSubmit(handleLogin)();
-                        }}
-                        className="flex-1 rounded-full border border-border/60 px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground hover:bg-accent transition-premium"
-                      >
-                        Try as Vendor
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          loginForm.setValue("email", "admin@rentwise.ai");
-                          loginForm.setValue("password", "admin123");
-                          loginForm.handleSubmit(handleLogin)();
-                        }}
-                        className="flex-1 rounded-full border border-border/60 px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground hover:bg-accent transition-premium"
-                      >
-                        Try as Admin
-                      </button>
-                    </div>
-                  </div>
                 </form>
               </Form>
             </motion.div>

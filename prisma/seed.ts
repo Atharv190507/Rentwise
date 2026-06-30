@@ -289,6 +289,8 @@ async function main() {
           status: "AVAILABLE",
           condition: tmpl.condition,
           imageUrl: `https://picsum.photos/seed/${slugify(tmpl.title)}/600/400`,
+          listingTypes: "RENT,BUY,BOOK",
+          location: vendor.address,
         },
         include: { vendor: true, category: true },
       });

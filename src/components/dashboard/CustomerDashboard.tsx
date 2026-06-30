@@ -419,13 +419,22 @@ function BookingsTab() {
                 <div className="flex items-center gap-4 p-4">
                   {/* Product Image */}
                   <div className="h-14 w-14 rounded-lg bg-muted flex-shrink-0 overflow-hidden">
-                    {b.product?.imageUrl ? (
-                      <img src={b.product.imageUrl} alt="" className="h-full w-full object-cover" />
-                    ) : (
-                      <div className="h-full w-full flex items-center justify-center text-muted-foreground">
-                        <Package className="h-5 w-5" />
-                      </div>
-                    )}
+                    {(() => {
+                      let imgSrc = b.product?.imageUrl || null;
+                      if (b.product && "images" in b.product && b.product.images) {
+                        try {
+                          const parsed = JSON.parse(b.product.images as string);
+                          if (Array.isArray(parsed) && parsed.length > 0) imgSrc = parsed[0];
+                        } catch { /* ignore */ }
+                      }
+                      return imgSrc ? (
+                        <img src={imgSrc} alt="" className="h-full w-full object-cover" />
+                      ) : (
+                        <div className="h-full w-full flex items-center justify-center text-muted-foreground">
+                          <Package className="h-5 w-5" />
+                        </div>
+                      );
+                    })()}
                   </div>
                   {/* Info */}
                   <div className="flex-1 min-w-0">

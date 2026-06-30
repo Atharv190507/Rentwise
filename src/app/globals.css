@@ -186,3 +186,53 @@
 .dark .card-hover:hover {
   box-shadow: 0 8px 30px oklch(0 0 0 / 30%);
 }
+
+/* Safe area insets for mobile */
+@supports (padding: env(safe-area-inset-bottom)) {
+  footer {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .pb-safe {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+}
+
+/* Mobile-optimized touch targets */
+@media (max-width: 640px) {
+  button, [role="button"], a, input, select, textarea {
+    min-height: 44px;
+  }
+  
+  /* Better tap highlight */
+  * {
+    -webkit-tap-highlight-color: transparent;
+  }
+  
+  /* Prevent text selection on interactive elements */
+  button, [role="button"], .card-hover {
+    -webkit-user-select: none;
+    user-select: none;
+  }
+}
+
+/* Smooth scroll for mobile */
+html {
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Hide scrollbar on horizontal scroll */
+.scrollbar-none {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+
+/* Better mobile input zoom prevention */
+@media (max-width: 640px) {
+  input[type="text"], input[type="email"], input[type="password"], input[type="number"], textarea, select {
+    font-size: 16px !important;
+  }
+}

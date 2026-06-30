@@ -13,11 +13,23 @@ export async function POST(req: NextRequest) {
     if (!vendor) return NextResponse.json({ error: "Vendor not found" }, { status: 404 });
 
     const body = await req.json();
-    const { title, description, features, categoryId, buyPrice, rentPricePerDay, deposit, stock, condition, imageUrl } = body;
+    const { title, description, features, categoryId, buyPrice, rentPricePerDay, deposit, stock, condition, images, listingTypes, location } = body;
 
     if (!title || !categoryId || !buyPrice || !rentPricePerDay) {
       return NextResponse.json({ error: "Title, category, prices are required" }, { status: 400 });
     }
+
+    // Parse images array — use first image as imageUrl for backward compat
+    let parsedImages: string[] = [];
+    if (images) {
+      try {
+        parsedImages = typeof images === "string" ? JSON.parse(images) : images;
+        if (!Array.isArray(parsedImages)) parsedImages = [];
+      } catch {
+        parsedImages = [];
+      }
+    }
+    const primaryImage = parsedImages.length > 0 ? parsedImages[0] : null;
 
     const product = await db.product.create({
       data: {
@@ -32,7 +44,10 @@ export async function POST(req: NextRequest) {
         deposit: parseFloat(deposit) || 0,
         stock: parseInt(stock) || 1,
         condition: condition || "GOOD",
-        imageUrl: imageUrl || null,
+        imageUrl: primaryImage,
+        images: parsedImages.length > 0 ? JSON.stringify(parsedImages) : null,
+        listingTypes: listingTypes || "RENT,BOOK",
+        location: location || null,
       },
     });
 
@@ -56,13 +71,23 @@ export async function GET(req: NextRequest) {
     const products = await db.product.findMany({
       where: { vendorId: vendor.id },
       include: {
-        category: { select: { name: true } },
+        vendor: { select: { id: true, businessName: true, isVerified: true } },
+        category: { select: { id: true, name: true, icon: true } },
+        reviews: { select: { rating: true } },
         _count: { select: { bookings: true, reviews: true } },
       },
       orderBy: { createdAt: "desc" },
     });
 
-    return NextResponse.json({ products });
+    const productsWithAvg = products.map((p) => ({
+      ...p,
+      avgRating: p.reviews.length
+        ? p.reviews.reduce((sum: number, r: { rating: number }) => sum + r.rating, 0) / p.reviews.length
+        : 0,
+      reviews: undefined,
+    }));
+
+    return NextResponse.json({ products: productsWithAvg });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : "Failed to fetch products";
     return NextResponse.json({ error: message }, { status: 500 });

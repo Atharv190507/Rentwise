@@ -22,7 +22,10 @@ import {
   Loader2,
   AlertCircle,
   Image as ImageIcon,
+  X,
   ArrowLeft,
+  Pencil,
+  Trash2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -317,10 +320,13 @@ function VendorOverviewTab({ data }: { data: VendorDashboardData | null }) {
 
 // --- Products Tab ---
 
-function VendorProductsTab({ products, loading, onAddProduct }: {
+function VendorProductsTab({ products, loading, onAddProduct, onEditProduct, onToggleStatus, onDeleteProduct }: {
   products: AppProduct[] | null;
   loading: boolean;
   onAddProduct: () => void;
+  onEditProduct: (product: AppProduct) => void;
+  onToggleStatus: (product: AppProduct) => void;
+  onDeleteProduct: (product: AppProduct) => void;
 }) {
   if (loading) return <ProductsGridSkeleton />;
 
@@ -359,22 +365,40 @@ function VendorProductsTab({ products, loading, onAddProduct }: {
         {products.map((p) => (
           <Card key={p.id} className="overflow-hidden card-hover">
             <div className="h-40 bg-muted relative">
-              {p.imageUrl ? (
-                <img src={p.imageUrl} alt={p.title} className="h-full w-full object-cover" />
-              ) : (
-                <div className="h-full w-full flex items-center justify-center">
-                  <ImageIcon className="h-10 w-10 text-muted-foreground/30" />
-                </div>
-              )}
-              <Badge
-                className={`absolute top-2 right-2 text-[10px] ${
+              {(() => {
+                let imgSrc = p.imageUrl || null;
+                if (p.images) {
+                  try {
+                    const parsed = JSON.parse(p.images);
+                    if (Array.isArray(parsed) && parsed.length > 0) imgSrc = parsed[0];
+                  } catch { /* ignore */ }
+                }
+                return imgSrc ? (
+                  <img src={imgSrc} alt={p.title} className="h-full w-full object-cover" />
+                ) : (
+                  <div className="h-full w-full flex items-center justify-center">
+                    <ImageIcon className="h-10 w-10 text-muted-foreground/30" />
+                  </div>
+                );
+              })()}
+              <button
+                onClick={() => onToggleStatus(p)}
+                className={`absolute top-2 right-2 text-[10px] cursor-pointer ${
                   p.status === "AVAILABLE"
                     ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400"
                     : "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400"
                 }`}
               >
-                {p.status}
-              </Badge>
+                <Badge
+                  className={`text-[10px] cursor-pointer ${
+                    p.status === "AVAILABLE"
+                      ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400"
+                      : "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400"
+                  }`}
+                >
+                  {p.status}
+                </Badge>
+              </button>
             </div>
             <CardContent className="p-4 space-y-2">
               <h3 className="font-semibold text-sm truncate">{p.title}</h3>
@@ -398,6 +422,26 @@ function VendorProductsTab({ products, loading, onAddProduct }: {
                   <span className="text-xs font-medium">{p.avgRating?.toFixed(1) || "—"} </span>
                 </div>
               </div>
+              <div className="flex gap-2 pt-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="flex-1 h-8 text-xs gap-1"
+                  onClick={() => onEditProduct(p)}
+                >
+                  <Pencil className="h-3.5 w-3.5" />
+                  Edit
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="flex-1 h-8 text-xs gap-1 text-red-600 border-red-200 hover:bg-red-50 dark:text-red-400 dark:border-red-800 dark:hover:bg-red-900/20"
+                  onClick={() => onDeleteProduct(p)}
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                  Delete
+                </Button>
+              </div>
             </CardContent>
           </Card>
         ))}
@@ -418,15 +462,22 @@ interface ProductFormData {
   deposit: string;
   stock: string;
   condition: string;
+  listingTypes: string;
+  location: string;
 }
 
-function AddProductTab({ categories, onSubmitted }: {
+function AddProductTab({ categories, onSubmitted, editingProduct }: {
   categories: Array<{ id: string; name: string }> | null;
   onSubmitted: () => void;
+  editingProduct?: AppProduct | null;
 }) {
   const { token } = useAppStore();
   const [aiLoading, setAiLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [uploadedImages, setUploadedImages] = useState<string[]>([]);
+  const [uploading, setUploading] = useState(false);
+
+  const isEditing = !!editingProduct;
 
   const {
     register,
@@ -438,6 +489,49 @@ function AddProductTab({ categories, onSubmitted }: {
   } = useForm<ProductFormData>();
 
   const title = watch("title");
+
+  // Pre-fill form when editing
+  useEffect(() => {
+    if (!editingProduct) return;
+    reset({
+      title: editingProduct.title,
+      categoryId: editingProduct.categoryId,
+      description: editingProduct.description,
+      buyPrice: editingProduct.buyPrice.toString(),
+      rentPricePerDay: editingProduct.rentPricePerDay.toString(),
+      deposit: editingProduct.deposit.toString(),
+      stock: editingProduct.stock.toString(),
+      condition: editingProduct.condition,
+      listingTypes: editingProduct.listingTypes || "RENT,BOOK",
+      location: editingProduct.location || "",
+    });
+    // Parse features
+    try {
+      const parsed = JSON.parse(editingProduct.features);
+      if (Array.isArray(parsed)) {
+        setValue("features", parsed.join(", "));
+      } else {
+        setValue("features", editingProduct.features);
+      }
+    } catch {
+      setValue("features", editingProduct.features);
+    }
+    // Parse images
+    if (editingProduct.images) {
+      try {
+        const parsed = JSON.parse(editingProduct.images);
+        if (Array.isArray(parsed)) {
+          setUploadedImages(parsed);
+        }
+      } catch {
+        if (editingProduct.imageUrl) {
+          setUploadedImages([editingProduct.imageUrl]);
+        }
+      }
+    } else if (editingProduct.imageUrl) {
+      setUploadedImages([editingProduct.imageUrl]);
+    }
+  }, [editingProduct, reset, setValue]);
 
   const handleAIGenerate = async () => {
     if (!title?.trim() || !token) return;
@@ -461,27 +555,83 @@ function AddProductTab({ categories, onSubmitted }: {
     }
   };
 
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    const remaining = 6 - uploadedImages.length;
+    if (remaining <= 0) {
+      toast.error("Maximum 6 images allowed");
+      return;
+    }
+
+    const filesToUpload = Array.from(files).slice(0, remaining);
+    setUploading(true);
+
+    try {
+      const formData = new FormData();
+      filesToUpload.forEach((f) => formData.append("images", f));
+
+      const res = await fetch("/api/upload", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || "Upload failed");
+      }
+
+      const data = await res.json();
+      setUploadedImages((prev) => [...prev, ...data.urls]);
+      toast.success(`${data.urls.length} image${data.urls.length > 1 ? "s" : ""} uploaded`);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Upload failed";
+      toast.error(message);
+    } finally {
+      setUploading(false);
+      // Reset the file input
+      e.target.value = "";
+    }
+  };
+
+  const removeImage = (index: number) => {
+    setUploadedImages((prev) => prev.filter((_, i) => i !== index));
+  };
+
   const onSubmit = async (formData: ProductFormData) => {
     if (!token) return;
     setSubmitting(true);
     try {
-      const res = await fetch("/api/vendors/products", {
-        method: "POST",
+      const payload = {
+        ...formData,
+        images: uploadedImages.length > 0 ? JSON.stringify(uploadedImages) : null,
+        buyPrice: Number(formData.buyPrice),
+        rentPricePerDay: Number(formData.rentPricePerDay),
+        deposit: Number(formData.deposit),
+        stock: Number(formData.stock),
+        listingTypes: formData.listingTypes || "RENT,BOOK",
+        location: formData.location || null,
+      };
+
+      const url = isEditing
+        ? `/api/vendors/products/${editingProduct.id}`
+        : "/api/vendors/products";
+      const method = isEditing ? "PUT" : "POST";
+
+      const res = await fetch(url, {
+        method,
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({
-          ...formData,
-          buyPrice: Number(formData.buyPrice),
-          rentPricePerDay: Number(formData.rentPricePerDay),
-          deposit: Number(formData.deposit),
-          stock: Number(formData.stock),
-        }),
+        body: JSON.stringify(payload),
       });
-      if (!res.ok) throw new Error("Failed to add product");
-      toast.success("Product added successfully!");
+      if (!res.ok) throw new Error(isEditing ? "Failed to update product" : "Failed to add product");
+      toast.success(isEditing ? "Product updated successfully!" : "Product added successfully!");
       reset();
+      setValue("listingTypes", "RENT,BOOK");
+      setUploadedImages([]);
       onSubmitted();
     } catch {
-      toast.error("Failed to add product");
+      toast.error(isEditing ? "Failed to update product" : "Failed to add product");
     } finally {
       setSubmitting(false);
     }
@@ -491,7 +641,7 @@ function AddProductTab({ categories, onSubmitted }: {
     <motion.div {...tabAnimation} className="max-w-2xl">
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Add New Product</CardTitle>
+          <CardTitle className="text-base">{isEditing ? "Edit Product" : "Add New Product"}</CardTitle>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
@@ -630,16 +780,147 @@ function AddProductTab({ categories, onSubmitted }: {
               </div>
             </div>
 
+            {/* Image Upload */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <Label>Product Images</Label>
+                <span className="text-xs text-muted-foreground">
+                  {uploadedImages.length}/6
+                </span>
+              </div>
+
+              {/* Upload Area */}
+              {uploadedImages.length < 6 && (
+                <label
+                  className={`flex flex-col items-center justify-center gap-2 w-full h-32 rounded-xl border-2 border-dashed cursor-pointer transition-colors ${
+                    uploading
+                      ? "border-primary/50 bg-primary/5 opacity-60"
+                      : "border-muted-foreground/25 hover:border-primary/50 hover:bg-primary/5"
+                  }`}
+                >
+                  <input
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp,image/gif,image/svg+xml"
+                    multiple
+                    className="hidden"
+                    onChange={handleImageUpload}
+                    disabled={uploading}
+                  />
+                  {uploading ? (
+                    <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                  ) : (
+                    <>
+                      <div className="h-10 w-10 rounded-full bg-muted flex items-center justify-center">
+                        <ImageIcon className="h-5 w-5 text-muted-foreground" />
+                      </div>
+                      <div className="text-center">
+                        <p className="text-sm font-medium text-foreground">
+                          Tap to upload images
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          JPG, PNG, WebP, GIF — Max 5MB each
+                        </p>
+                      </div>
+                    </>
+                  )}
+                </label>
+              )}
+
+              {/* Image Previews */}
+              {uploadedImages.length > 0 && (
+                <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
+                  {uploadedImages.map((url, idx) => (
+                    <div
+                      key={idx}
+                      className="relative aspect-square rounded-lg overflow-hidden border bg-muted group"
+                    >
+                      <img
+                        src={url}
+                        alt={`Upload ${idx + 1}`}
+                        className="h-full w-full object-cover"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => removeImage(idx)}
+                        className="absolute top-1 right-1 h-5 w-5 rounded-full bg-black/60 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                      {idx === 0 && (
+                        <span className="absolute bottom-0 left-0 right-0 bg-black/60 text-white text-[9px] text-center py-0.5">
+                          Main
+                        </span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Listing Types */}
+            <div className="space-y-2">
+              <Label>Available For</Label>
+              <div className="grid grid-cols-3 gap-3">
+                {[
+                  { value: "RENT", label: "Rent", icon: "🔄", desc: "Daily/weekly rental" },
+                  { value: "BUY", label: "Sell", icon: "💰", desc: "One-time purchase" },
+                  { value: "BOOK", label: "Book", icon: "📅", desc: "Date-based booking" },
+                ].map((type) => (
+                  <label
+                    key={type.value}
+                    className="flex flex-col items-center gap-1.5 p-3 rounded-lg border cursor-pointer has-[:checked]:border-primary has-[:checked]:bg-primary/5 transition-colors"
+                  >
+                    <input
+                      type="checkbox"
+                      value={type.value}
+                      className="sr-only"
+                      onChange={(e) => {
+                        const current = watch("listingTypes") || "";
+                        const types = current ? current.split(",") : [];
+                        if (e.target.checked) {
+                          if (!types.includes(type.value)) types.push(type.value);
+                        } else {
+                          const idx = types.indexOf(type.value);
+                          if (idx > -1) types.splice(idx, 1);
+                        }
+                        setValue("listingTypes", types.join(","));
+                      }}
+                      defaultChecked={["RENT", "BOOK"].includes(type.value)}
+                    />
+                    <span className="text-lg">{type.icon}</span>
+                    <span className="text-xs font-medium">{type.label}</span>
+                    <span className="text-[10px] text-muted-foreground text-center">{type.desc}</span>
+                  </label>
+                ))}
+              </div>
+              <input type="hidden" {...register("listingTypes")} />
+            </div>
+
+            {/* Location */}
+            <div className="space-y-2">
+              <Label htmlFor="location">Location / City</Label>
+              <Input
+                id="location"
+                placeholder="e.g. Bengaluru, Mumbai, Delhi"
+                {...register("location")}
+              />
+              <p className="text-xs text-muted-foreground">Where is this equipment available?</p>
+            </div>
+
             <Button type="submit" className="w-full" disabled={submitting}>
               {submitting ? (
                 <>
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Adding Product...
+                  {isEditing ? "Saving Changes..." : "Adding Product..."}
                 </>
               ) : (
                 <>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add Product
+                  {isEditing ? (
+                    <Pencil className="h-4 w-4 mr-2" />
+                  ) : (
+                    <Plus className="h-4 w-4 mr-2" />
+                  )}
+                  {isEditing ? "Save Changes" : "Add Product"}
                 </>
               )}
             </Button>
@@ -895,6 +1176,7 @@ export default function VendorDashboard() {
   const [loading, setLoading] = useState(true);
   const [productsLoading, setProductsLoading] = useState(false);
   const [bookingsLoading, setBookingsLoading] = useState(false);
+  const [editingProduct, setEditingProduct] = useState<AppProduct | null>(null);
 
   const fetchDashboard = useCallback(async () => {
     if (!token) return;
@@ -961,7 +1243,46 @@ export default function VendorDashboard() {
     if (vendorTab === "bookings") fetchBookings();
   }, [vendorTab, fetchProducts, fetchBookings]);
 
+  const handleEditProduct = (product: AppProduct) => {
+    setEditingProduct(product);
+    setVendorTab("edit-product");
+  };
+
+  const handleToggleStatus = async (product: AppProduct) => {
+    if (!token) return;
+    try {
+      const newStatus = product.status === "AVAILABLE" ? "UNAVAILABLE" : "AVAILABLE";
+      const res = await fetch(`/api/vendors/products/${product.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ status: newStatus }),
+      });
+      if (!res.ok) throw new Error("Failed to update status");
+      toast.success(`Product marked as ${newStatus}`);
+      fetchProducts();
+    } catch {
+      toast.error("Failed to update product status");
+    }
+  };
+
+  const handleDeleteProduct = async (product: AppProduct) => {
+    if (!token) return;
+    if (!window.confirm(`Delete "${product.title}"? This cannot be undone.`)) return;
+    try {
+      const res = await fetch(`/api/vendors/products/${product.id}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error("Failed to delete");
+      toast.success("Product deleted");
+      fetchProducts();
+    } catch {
+      toast.error("Failed to delete product");
+    }
+  };
+
   const handleProductSubmitted = () => {
+    setEditingProduct(null);
     setVendorTab("products");
     fetchProducts();
   };
@@ -1024,6 +1345,9 @@ export default function VendorDashboard() {
                 products={productsLoading ? null : products}
                 loading={productsLoading}
                 onAddProduct={() => setVendorTab("add-product")}
+                onEditProduct={handleEditProduct}
+                onToggleStatus={handleToggleStatus}
+                onDeleteProduct={handleDeleteProduct}
               />
             </TabsContent>
           )}
@@ -1039,6 +1363,19 @@ export default function VendorDashboard() {
           {vendorTab === "add-product" && (
             <TabsContent value="add-product">
               <AddProductTab categories={categories} onSubmitted={handleProductSubmitted} />
+            </TabsContent>
+          )}
+          {vendorTab === "edit-product" && editingProduct && (
+            <TabsContent value="edit-product">
+              <AddProductTab
+                categories={categories}
+                onSubmitted={() => {
+                  setEditingProduct(null);
+                  setVendorTab("products");
+                  fetchProducts();
+                }}
+                editingProduct={editingProduct}
+              />
             </TabsContent>
           )}
           {vendorTab === "analytics" && (

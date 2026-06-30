@@ -174,7 +174,7 @@ export default function BookingDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto mx-2 sm:mx-0 rounded-2xl">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-lg">
             <Package className="h-5 w-5" />
@@ -188,17 +188,26 @@ export default function BookingDialog({
         <div className="space-y-5 pt-2">
           {/* Product Preview */}
           <div className="flex gap-3 p-3 rounded-lg bg-muted/50 border">
-            {product.imageUrl ? (
-              <img
-                src={product.imageUrl}
-                alt={product.title}
-                className="h-16 w-16 rounded-md object-cover shrink-0"
-              />
-            ) : (
-              <div className="h-16 w-16 rounded-md bg-muted flex items-center justify-center shrink-0">
-                <Package className="h-6 w-6 text-muted-foreground" />
-              </div>
-            )}
+            {(() => {
+              let imgSrc = product.imageUrl || null;
+              if (product.images) {
+                try {
+                  const parsed = JSON.parse(product.images);
+                  if (Array.isArray(parsed) && parsed.length > 0) imgSrc = parsed[0];
+                } catch { /* ignore */ }
+              }
+              return imgSrc ? (
+                <img
+                  src={imgSrc}
+                  alt={product.title}
+                  className="h-16 w-16 rounded-md object-cover shrink-0"
+                />
+              ) : (
+                <div className="h-16 w-16 rounded-md bg-muted flex items-center justify-center shrink-0">
+                  <Package className="h-6 w-6 text-muted-foreground" />
+                </div>
+              );
+            })()}
             <div className="min-w-0">
               <p className="font-medium text-sm truncate">{product.title}</p>
               <p className="text-xs text-muted-foreground">

@@ -61,20 +61,40 @@ interface ProductCardProps {
 export default function ProductCard({ product }: ProductCardProps) {
   const { navigateTo, openAuthDialog, user } = useAppStore();
 
+  // Get primary image from images array or fallback to imageUrl
+  const primaryImage = (() => {
+    if (product.images) {
+      try {
+        const parsed = JSON.parse(product.images);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed[0];
+      } catch { /* ignore */ }
+    }
+    return product.imageUrl || null;
+  })();
+  const imageCount = (() => {
+    if (product.images) {
+      try {
+        const parsed = JSON.parse(product.images);
+        if (Array.isArray(parsed)) return parsed.length;
+      } catch { /* ignore */ }
+    }
+    return 0;
+  })();
+
   const handleClick = () => {
     navigateTo("product-detail", product.id);
   };
 
   return (
     <Card
-      className="card-hover overflow-hidden cursor-pointer group"
+      className="card-hover overflow-hidden cursor-pointer group active:scale-[0.98] transition-transform"
       onClick={handleClick}
     >
       {/* Image */}
       <div className="relative aspect-[4/3] overflow-hidden bg-muted">
-        {product.imageUrl ? (
+        {primaryImage ? (
           <img
-            src={product.imageUrl}
+            src={primaryImage}
             alt={product.title}
             loading="lazy"
             className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
@@ -91,6 +111,15 @@ export default function ProductCard({ product }: ProductCardProps) {
             <Badge className="bg-white/90 text-emerald-700 border-0 backdrop-blur-sm gap-1 text-[10px] font-medium dark:bg-black/60 dark:text-emerald-400">
               <CheckCircle2 className="h-3 w-3" />
               Verified
+            </Badge>
+          </div>
+        )}
+
+        {/* Image count badge */}
+        {imageCount > 1 && (
+          <div className="absolute bottom-2 right-2">
+            <Badge className="bg-black/60 text-white border-0 backdrop-blur-sm gap-1 text-[10px] font-medium">
+              {imageCount} photos
             </Badge>
           </div>
         )}
@@ -136,15 +165,17 @@ export default function ProductCard({ product }: ProductCardProps) {
           </div>
         )}
 
-        {/* Booking Type Badges */}
-        <div className="flex gap-1.5">
-          <Badge className="bg-emerald-100 text-emerald-700 border-0 text-[10px] dark:bg-emerald-900/30 dark:text-emerald-400">
-            Rent
-          </Badge>
-          <Badge className="bg-violet-100 text-violet-700 border-0 text-[10px] dark:bg-violet-900/30 dark:text-violet-400">
-            Buy
-          </Badge>
-        </div>
+        {/* Booking Type Badges - Hidden for Vendors */}
+        {user?.role !== "VENDOR" ? (
+          <div className="flex gap-1.5">
+            <Badge className="bg-emerald-100 text-emerald-700 border-0 text-[10px] dark:bg-emerald-900/30 dark:text-emerald-400">
+              Rent
+            </Badge>
+            <Badge className="bg-violet-100 text-violet-700 border-0 text-[10px] dark:bg-violet-900/30 dark:text-violet-400">
+              Buy
+            </Badge>
+          </div>
+        ) : null}
 
         {/* Prices */}
         <div className="flex items-end justify-between pt-1">
@@ -159,7 +190,11 @@ export default function ProductCard({ product }: ProductCardProps) {
               Buy: {formatINR(product.buyPrice)}
             </p>
           </div>
-          <ShoppingCart className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-premium" />
+          {user?.role === "VENDOR" ? (
+            <span className="text-xs text-muted-foreground">{product.stock} in stock</span>
+          ) : (
+            <ShoppingCart className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-premium" />
+          )}
         </div>
       </CardContent>
     </Card>

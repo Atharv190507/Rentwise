@@ -65,3 +65,46 @@ Stage Summary:
 - Admin login now works: admin@rentwise.ai / admin123
 - Seed data fully populated: 72 users, 98 products, 500 bookings
 - Admin dashboard renders with stat cards, bar charts, and recent bookings table
+
+---
+Task ID: 2-a
+Agent: Main
+Task: Create vendor product management API endpoints (PUT/PATCH/DELETE)
+
+Work Log:
+- Created `src/app/api/vendors/products/[id]/route.ts` with three HTTP handlers
+- **PUT** handler: Full product update with vendor ownership verification. Accepts all updatable fields (title, description, features, categoryId, buyPrice, rentPricePerDay, deposit, stock, condition, images, listingTypes, location). Parses `images` as JSON array and sets `imageUrl` to first image for backward compat. Stringifies `features` if array. Regenerates slug from title.
+- **PATCH** handler: Toggles product status between AVAILABLE/UNAVAILABLE. Validates status value. Verifies vendor ownership before update.
+- **DELETE** handler: Deletes a product after verifying vendor ownership. Relies on SQLite cascading for associated bookings/reviews cleanup.
+- Extracted shared helper functions (`authenticateVendor`, `findOwnedProduct`) to eliminate auth + ownership check duplication across all three handlers.
+- Used Next.js 16 async params pattern: `{ params }: { params: Promise<{ id: string }> }`
+- All lint checks passing with zero errors.
+
+Stage Summary:
+- Vendor can now fully manage their products via REST API: create (existing POST), list (existing GET), edit (PUT), toggle status (PATCH), delete (DELETE)
+- Consistent auth pattern: Bearer token → verify → check VENDOR role → resolve vendor → verify ownership
+- No modifications to existing files
+
+---
+Task ID: 2-b
+Agent: Main
+Task: Vendor dashboard edit/delete actions and marketplace vendor filtering
+
+Work Log:
+- Updated `DashboardTab` type in `src/lib/types.ts` — added "edit-product" to vendor tab union
+- Updated `MarketplaceView.tsx` — when user role is VENDOR, fetches from `/api/vendors/products` with auth token instead of public API; applies search/category filters client-side; hides Hero, Categories, HowItWorks, WhyRentWise sections; shows "Showing your equipment" banner with Store icon
+- Added `Store` to lucide-react imports in MarketplaceView
+- Added `Pencil` and `Trash2` to lucide-react imports in VendorDashboard.tsx
+- Rewrote `VendorProductsTab` with new props: `onEditProduct`, `onToggleStatus`, `onDeleteProduct` — each product card now has clickable status badge (toggles AVAILABLE/UNAVAILABLE), Edit button (Pencil icon), and Delete button (Trash2 icon) in a footer action row
+- Added `editingProduct` state to main `VendorDashboard` component
+- Added `handleEditProduct` (sets editingProduct + switches to edit-product tab), `handleToggleStatus` (PATCH to toggle status), `handleDeleteProduct` (DELETE with window.confirm)
+- Updated `handleProductSubmitted` to also reset `editingProduct`
+- Added `edit-product` TabsContent that reuses `AddProductTab` with `editingProduct` prop
+- Updated `AddProductTab` to accept optional `editingProduct` prop: pre-fills form via `useEffect` with `reset()` and `setValue()`, parses features (JSON or comma-split) and images, changes card title to "Edit Product", changes submit button to "Save Changes", uses PUT instead of POST when editing
+- All lint checks passing with zero errors
+
+Stage Summary:
+- Vendors now see only their own products on the marketplace page (not all vendors' products)
+- Vendor dashboard Products tab has full CRUD: Edit, Toggle Status (click badge), Delete with confirmation
+- Edit product flow reuses AddProductTab with pre-filled data and PUT method
+- No API or schema changes made — all frontend-only updates

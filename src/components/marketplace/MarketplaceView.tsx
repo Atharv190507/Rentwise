@@ -8,6 +8,7 @@ import {
   Sparkles,
   X,
   PackageOpen,
+  Store,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -67,7 +68,8 @@ const SORT_OPTIONS = [
 ];
 
 export default function MarketplaceView() {
-  const { navigateTo, openAuthDialog } = useAppStore();
+  const { navigateTo, openAuthDialog, user, token } = useAppStore();
+  const isVendor = user?.role === "VENDOR";
 
   // Data
   const [categories, setCategories] = useState<AppCategory[]>([]);
@@ -91,6 +93,13 @@ export default function MarketplaceView() {
 
   // Event planner dialog
   const [eventPlannerOpen, setEventPlannerOpen] = useState(false);
+
+  // Listen for open-event-planner events from Footer
+  useEffect(() => {
+    const handler = () => setEventPlannerOpen(true);
+    window.addEventListener("open-event-planner", handler);
+    return () => window.removeEventListener("open-event-planner", handler);
+  }, []);
 
   // Listen for search events from Navbar / Hero
   useEffect(() => {
@@ -154,29 +163,55 @@ export default function MarketplaceView() {
   const fetchProducts = useCallback(async () => {
     setLoading(true);
     try {
-      const params = new URLSearchParams();
-      params.set("page", page.toString());
-      params.set("limit", ITEMS_PER_PAGE.toString());
-      if (activeSearch) params.set("search", activeSearch);
-      if (selectedCategory !== "ALL") params.set("categoryId", selectedCategory);
-      if (bookingType !== "ALL") params.set("bookingType", bookingType);
-      if (condition !== "ALL") params.set("condition", condition);
-      if (priceRange[0] > 0) params.set("minPrice", priceRange[0].toString());
-      if (priceRange[1] < 50000) params.set("maxPrice", priceRange[1].toString());
-      if (sortBy) params.set("sort", sortBy);
+      if (isVendor && token) {
+        // Vendor sees only their own products
+        const res = await fetch("/api/vendors/products", {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (res.ok) {
+          const data = await res.json();
+          let vendorProducts: AppProduct[] = data.products || data || [];
+          // Apply search filter client-side
+          if (activeSearch) {
+            const q = activeSearch.toLowerCase();
+            vendorProducts = vendorProducts.filter((p) =>
+              p.title.toLowerCase().includes(q)
+            );
+          }
+          // Apply category filter client-side
+          if (selectedCategory !== "ALL") {
+            vendorProducts = vendorProducts.filter(
+              (p) => p.categoryId === selectedCategory
+            );
+          }
+          setProducts(vendorProducts);
+          setTotalCount(vendorProducts.length);
+        }
+      } else {
+        const params = new URLSearchParams();
+        params.set("page", page.toString());
+        params.set("limit", ITEMS_PER_PAGE.toString());
+        if (activeSearch) params.set("search", activeSearch);
+        if (selectedCategory !== "ALL") params.set("categoryId", selectedCategory);
+        if (bookingType !== "ALL") params.set("bookingType", bookingType);
+        if (condition !== "ALL") params.set("condition", condition);
+        if (priceRange[0] > 0) params.set("minPrice", priceRange[0].toString());
+        if (priceRange[1] < 50000) params.set("maxPrice", priceRange[1].toString());
+        if (sortBy) params.set("sort", sortBy);
 
-      const res = await fetch(`/api/products?${params.toString()}`);
-      if (res.ok) {
-        const data = await res.json();
-        setProducts(data.products || data);
-        setTotalCount(data.total || (Array.isArray(data) ? data.length : 0));
+        const res = await fetch(`/api/products?${params.toString()}`);
+        if (res.ok) {
+          const data = await res.json();
+          setProducts(data.products || data);
+          setTotalCount(data.total || (Array.isArray(data) ? data.length : 0));
+        }
       }
     } catch {
       // silently fail
     } finally {
       setLoading(false);
     }
-  }, [page, activeSearch, selectedCategory, bookingType, condition, priceRange, sortBy]);
+  }, [page, activeSearch, selectedCategory, bookingType, condition, priceRange, sortBy, isVendor, token]);
 
   useEffect(() => {
     fetchProducts();
@@ -323,11 +358,26 @@ export default function MarketplaceView() {
 
   return (
     <div className="flex-1">
-      {/* 1. Hero Section */}
-      <HeroSection />
+      {/* Vendor banner instead of hero/categories for vendor users */}
+      {!isVendor && <HeroSection />}
 
-      {/* 2. Categories Showcase */}
-      <CategoriesShowcase />
+      {!isVendor && <CategoriesShowcase />}
+
+      {isVendor && (
+        <div className="bg-primary/5 border-b">
+          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-6">
+            <div className="flex items-center gap-3">
+              <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
+                <Store className="h-5 w-5 text-primary" />
+              </div>
+              <div>
+                <h2 className="text-lg font-semibold text-foreground">Showing your equipment</h2>
+                <p className="text-sm text-muted-foreground">Manage and view all products you&apos;ve listed</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* 3. Marketplace Content */}
       <div id="marketplace-content" className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8 sm:py-10">
@@ -336,19 +386,23 @@ export default function MarketplaceView() {
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div>
               <h2 className="text-2xl sm:text-3xl font-bold text-foreground">
-                All Equipment
+                {isVendor ? "My Equipment" : "All Equipment"}
               </h2>
               <p className="text-sm text-muted-foreground mt-1">
-                Rent, buy, or book from verified vendors across India
+                {isVendor
+                  ? "Manage and monitor your listed equipment"
+                  : "Rent, buy, or book from verified vendors across India"}
               </p>
             </div>
-            <Button
-              onClick={() => setEventPlannerOpen(true)}
-              className="gap-2 rounded-full self-start sm:self-auto"
-            >
-              <Sparkles className="h-4 w-4" />
-              AI Event Planner
-            </Button>
+            {!isVendor && (
+              <Button
+                onClick={() => setEventPlannerOpen(true)}
+                className="gap-2 rounded-full self-start sm:self-auto"
+              >
+                <Sparkles className="h-4 w-4" />
+                AI Event Planner
+              </Button>
+            )}
           </div>
         </div>
 
@@ -639,10 +693,10 @@ export default function MarketplaceView() {
       </div>
 
       {/* 4. How It Works */}
-      <HowItWorks />
+      {!isVendor && <HowItWorks />}
 
       {/* 5. Why RentWise */}
-      <WhyRentWise />
+      {!isVendor && <WhyRentWise />}
 
       {/* Event Planner Dialog */}
       <EventPlannerDialog open={eventPlannerOpen} onOpenChange={setEventPlannerOpen} />
