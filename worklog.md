@@ -108,3 +108,83 @@ Stage Summary:
 - Vendor dashboard Products tab has full CRUD: Edit, Toggle Status (click badge), Delete with confirmation
 - Edit product flow reuses AddProductTab with pre-filled data and PUT method
 - No API or schema changes made — all frontend-only updates
+
+---
+Task ID: 4
+Agent: Main
+Task: Build AI Event Planning Engine backend API (4 routes)
+
+Work Log:
+- Created `/api/ai/event-plan/route.ts` (POST) — Main AI event planning endpoint
+  - Requires Bearer token auth (401 if missing)
+  - Accepts event details (eventType, guests, venueType, budget, city, duration, eventDate, requirements, preference, quality)
+  - Fetches ALL available products from DB with vendor, category, and review data
+  - Builds structured inventory prompt with product IDs, prices, stock, vendor info, ratings
+  - Calls z-ai-web-dev-sdk to generate 3 packages (ECONOMY, STANDARD, PREMIUM) with cost-aware instructions
+  - Parses AI JSON response, validates product IDs against actual inventory (nullifies invalid refs gracefully)
+  - Saves EventPlan record with full prompt, raw AI response, and parsed packages JSON
+  - Returns structured response with packages, upsells, and tips
+- Created `/api/event-plans/route.ts` (GET) — Lists authenticated user's event plans
+  - Returns id, eventType, guests, budget, status, selectedTier, createdAt, _count.packageBookings
+  - Ordered by createdAt desc
+- Created `/api/event-plans/[id]/route.ts` (GET, DELETE) — Single event plan operations
+  - GET: Returns full plan details with parsed packages JSON and packageBookings+items
+  - DELETE: Only DRAFT plans can be deleted; verifies ownership before deletion
+  - Uses Next.js 16 async params pattern
+- Created `/api/event-plans/[id]/book/route.ts` (POST) — Book a package tier from an event plan
+  - Accepts tier (ECONOMY/STANDARD/PREMIUM) and startDate/endDate
+  - Validates ownership and plan status (must not already be BOOKED)
+  - Parses plan's packages JSON, finds selected tier items
+  - For each item: validates productId, creates Booking + Payment (PENDING) records
+  - Creates PackageBooking and PackageItem records for each item
+  - Skips items with null/invalid productId (creates PackageItem only, no Booking)
+  - Updates EventPlan status to "BOOKED" and sets selectedTier
+  - Returns booking summary with totalCost, totalDeposit, itemCount
+- All 4 files pass ESLint with zero errors
+
+Stage Summary:
+- Complete AI Event Planning Engine backend: plan generation, listing, detail/delete, and booking flow
+- AI endpoint uses real inventory data to generate cost-optimized 3-tier packages
+- Booking flow creates proper Booking + Payment + PackageBooking + PackageItem records
+- Graceful handling of invalid AI product references and missing data---
+Task ID: 4
+Agent: Main
+Task: Build AI Event Planning Engine - Complete Feature
+
+Work Log:
+- Read existing project state: DB schema (EventPlan, PackageBooking, PackageItem already exist), existing EventPlannerDialog (basic), marketplace structure, API patterns
+- Updated types.ts: Added "ai-event-planner" to AppView, "event-plans" to customer DashboardTab, new types (AIPackageItem, AITierPackage, AIEventPlanResult, SavedEventPlan)
+- Backend subagent created 4 API routes:
+  - POST /api/ai/event-plan: Fetches all available products from DB, sends structured inventory prompt to Gemini AI, generates 3-tier packages (Economy/Standard/Premium) with real product matching, saves to EventPlan table
+  - GET /api/event-plans: Lists user's saved event plans
+  - GET/DELETE /api/event-plans/[id]: Get/delete single event plan (owner-only, DRAFT only for delete)
+  - POST /api/event-plans/[id]/book: Books a package tier - creates Booking, Payment, PackageBooking, PackageItem records for all items
+- Fixed critical bug: Static `import ZAI from "z-ai-web-dev-sdk"` causes Turbopack compilation crash in the event-plan route. Fixed with lazy dynamic import: `const zaiSdk = await import("z-ai-web-dev-sdk"); const ZAI = zaiSdk.default;`
+- Created AIEventPlannerView.tsx: Full-page multi-step AI Event Planner with 5 steps:
+  - Form Step: Event type (10 options), guests, venue type (radio), budget, city, duration, date, requirements, preference (Rent/Buy/Both), quality (Basic/Standard/Premium)
+  - Generating Step: Animated progress with 5 stages cycling every 2.5s
+  - Results Step: 3-tier comparison cards (Economy=green, Standard=amber, Premium=violet) with cost, item count, budget indicators, top items preview, upsells section, pro tips
+  - Detail Step: Full equipment table with name, category, qty, rent/day, duration, subtotal, vendor name+rating, priority badges (Essential/Recommended/Optional)
+  - Booking Step: Package summary, date selection, item list, confirm button
+  - Success Step: Animated confirmation with dashboard link
+- Updated page.tsx: Added AIEventPlannerView to AnimatePresence block for "ai-event-planner" view
+- Updated MarketplaceView.tsx: 
+  - Removed EventPlannerDialog import and state
+  - Changed "AI Event Planner" button to navigate to "ai-event-planner" view
+  - Added prominent "Plan My Event with AI" CTA section between CategoriesShowcase and marketplace content (gradient bg, feature cards, animated with Framer Motion)
+- Updated Footer.tsx: Changed "AI Event Planner" link from CustomEvent to navigateTo("ai-event-planner")
+- Added Event Plans tab to CustomerDashboard with:
+  - Plan list (event type, status badge, tier badge, guests, budget, date, booking count)
+  - Delete button for DRAFT plans
+  - Empty state with CTA
+  - "Plan New Event" button
+- API verified working: Economy=5 items/₹8,383, Standard=8 items/₹15,489, Premium=11 items/₹23,935 for Birthday/30 guests/₹20k budget
+- Lint passes with zero errors
+
+Stage Summary:
+- Complete AI Event Planning Engine with 4 API routes, 1 new full-page component, 3 updated components
+- AI generates 3 real packages matched from actual marketplace inventory (not imaginary products)
+- Full booking pipeline: AI plan → select tier → book → creates individual bookings + package booking records
+- Prominent "Plan My Event with AI" section on marketplace homepage
+- Customer dashboard shows saved event plans with status management
+- Note: z-ai-web-dev-sdk must be lazily imported (not static) in event-plan route due to Turbopack compilation issue

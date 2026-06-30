@@ -1,0 +1,787 @@
+     1→     1→"use client";
+     2→     2→
+     3→     3→import { useState, useEffect, useCallback } from "react";
+     4→     4→import { motion, AnimatePresence } from "framer-motion";
+     5→     5→import { toast } from "sonner";
+     6→     6→import {
+     7→     7→  Package,
+     8→     8→  Calendar,
+     9→     9→  DollarSign,
+    10→    10→  Sparkles,
+    11→    11→  Star,
+    12→    12→  Clock,
+    13→    13→  CheckCircle,
+    14→    14→  XCircle,
+    15→    15→  ChevronDown,
+    16→    16→  ChevronUp,
+    17→    17→  Filter,
+    18→    18→  Eye,
+    19→    19→  TrendingDown,
+    20→    20→  Lightbulb,
+    21→    21→  ArrowLeft,
+    22→    22→} from "lucide-react";
+    23→    23→import { Button } from "@/components/ui/button";
+    24→    24→import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+    25→    25→import { Badge } from "@/components/ui/badge";
+    26→    26→import { Input } from "@/components/ui/input";
+    27→    27→import { Skeleton } from "@/components/ui/skeleton";
+    28→    28→import { Separator } from "@/components/ui/separator";
+    29→    29→import {
+    30→    30→  Select,
+    31→    31→  SelectContent,
+    32→    32→  SelectItem,
+    33→    33→  SelectTrigger,
+    34→    34→  SelectValue,
+    35→    35→} from "@/components/ui/select";
+    36→    36→import {
+    37→    37→  Table,
+    38→    38→  TableBody,
+    39→    39→  TableCell,
+    40→    40→  TableHead,
+    41→    41→  TableHeader,
+    42→    42→  TableRow,
+    43→    43→} from "@/components/ui/table";
+    44→    44→import {
+    45→    45→  Tabs,
+    46→    46→  TabsContent,
+    47→    47→  TabsList,
+    48→    48→  TabsTrigger,
+    49→    49→} from "@/components/ui/tabs";
+    50→    50→import {
+    51→    51→  AlertDialog,
+    52→    52→  AlertDialogAction,
+    53→    53→  AlertDialogCancel,
+    54→    54→  AlertDialogContent,
+    55→    55→  AlertDialogDescription,
+    56→    56→  AlertDialogFooter,
+    57→    57→  AlertDialogHeader,
+    58→    58→  AlertDialogTitle,
+    59→    59→} from "@/components/ui/alert-dialog";
+    60→    60→import { useAppStore } from "@/stores/app-store";
+    61→    61→import type {
+    62→    62→  AppBooking,
+    63→    63→  AIRecommendationResult,
+    64→    64→  BookingStatus,
+    65→    65→  BookingType,
+    66→    66→} from "@/lib/types";
+    67→    67→import { BOOKING_STATUS_COLORS, BOOKING_TYPE_COLORS } from "@/lib/types";
+    68→    68→
+    69→    69→const tabAnimation = {
+    70→    70→  initial: { opacity: 0, y: 12 },
+    71→    71→  animate: { opacity: 1, y: 0 },
+    72→    72→  exit: { opacity: 0, y: -12 },
+    73→    73→  transition: { duration: 0.25, ease: "easeOut" },
+    74→    74→};
+    75→    75→
+    76→    76→function formatINR(amount: number) {
+    77→    77→  return `₹${amount.toLocaleString("en-IN")}`;
+    78→    78→}
+    79→    79→
+    80→    80→function formatDate(dateStr: string) {
+    81→    81→  return new Date(dateStr).toLocaleDateString("en-IN", {
+    82→    82→    day: "numeric",
+    83→    83→    month: "short",
+    84→    84→    year: "numeric",
+    85→    85→  });
+    86→    86→}
+    87→    87→
+    88→    88→// --- Skeleton Components ---
+    89→    89→
+    90→    90→function StatCardSkeleton() {
+    91→    91→  return (
+    92→    92→    <Card className="p-4">
+    93→    93→      <div className="flex items-center gap-4">
+    94→    94→        <Skeleton className="h-10 w-10 rounded-lg" />
+    95→    95→        <div className="space-y-2 flex-1">
+    96→    96→          <Skeleton className="h-5 w-20" />
+    97→    97→          <Skeleton className="h-3 w-24" />
+    98→    98→        </div>
+    99→    99→      </div>
+   100→   100→    </Card>
+   101→   101→  );
+   102→   102→}
+   103→   103→
+   104→   104→function OverviewSkeleton() {
+   105→   105→  return (
+   106→   106→    <div className="space-y-6">
+   107→   107→      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+   108→   108→        <StatCardSkeleton />
+   109→   109→        <StatCardSkeleton />
+   110→   110→        <StatCardSkeleton />
+   111→   111→        <StatCardSkeleton />
+   112→   112→      </div>
+   113→   113→      <Card>
+   114→   114→        <CardHeader className="pb-3">
+   115→   115→          <Skeleton className="h-5 w-36" />
+   116→   116→        </CardHeader>
+   117→   117→        <CardContent>
+   118→   118→          <div className="space-y-3">
+   119→   119→            {[...Array(5)].map((_, i) => (
+   120→   120→              <Skeleton key={i} className="h-12 w-full" />
+   121→   121→            ))}
+   122→   122→          </div>
+   123→   123→        </CardContent>
+   124→   124→      </Card>
+   125→   125→    </div>
+   126→   126→  );
+   127→   127→}
+   128→   128→
+   129→   129→function BookingsSkeleton() {
+   130→   130→  return (
+   131→   131→    <div className="space-y-4">
+   132→   132→      <div className="flex gap-3">
+   133→   133→        <Skeleton className="h-9 w-40" />
+   134→   134→        <Skeleton className="h-9 w-40" />
+   135→   135→      </div>
+   136→   136→      <Card>
+   137→   137→        <CardContent className="p-0">
+   138→   138→          <div className="space-y-3 p-4">
+   139→   139→            {[...Array(5)].map((_, i) => (
+   140→   140→              <Skeleton key={i} className="h-20 w-full rounded-lg" />
+   141→   141→            ))}
+   142→   142→          </div>
+   143→   143→        </CardContent>
+   144→   144→      </Card>
+   145→   145→    </div>
+   146→   146→  );
+   147→   147→}
+   148→   148→
+   149→   149→function ReviewsSkeleton() {
+   150→   150→  return (
+   151→   151→    <div className="space-y-4">
+   152→   152→      {[...Array(4)].map((_, i) => (
+   153→   153→        <Card key={i}>
+   154→   154→          <CardContent className="p-4">
+   155→   155→            <div className="flex gap-4">
+   156→   156→              <div className="flex-1 space-y-2">
+   157→   157→                <Skeleton className="h-5 w-48" />
+   158→   158→                <Skeleton className="h-4 w-24" />
+   159→   159→                <Skeleton className="h-4 w-full" />
+   160→   160→              </div>
+   161→   161→              <Skeleton className="h-3 w-20" />
+   162→   162→            </div>
+   163→   163→          </CardContent>
+   164→   164→        </Card>
+   165→   165→      ))}
+   166→   166→    </div>
+   167→   167→  );
+   168→   168→}
+   169→   169→
+   170→   170→function AIHistorySkeleton() {
+   171→   171→  return (
+   172→   172→    <div className="space-y-4">
+   173→   173→      {[...Array(3)].map((_, i) => (
+   174→   174→        <Card key={i}>
+   175→   175→          <CardContent className="p-4 space-y-3">
+   176→   176→            <Skeleton className="h-5 w-48" />
+   177→   177→            <Skeleton className="h-4 w-full" />
+   178→   178→            <Skeleton className="h-4 w-3/4" />
+   179→   179→          </CardContent>
+   180→   180→        </Card>
+   181→   181→      ))}
+   182→   182→    </div>
+   183→   183→  );
+   184→   184→}
+   185→   185→
+   186→   186→// --- Overview Tab ---
+   187→   187→
+   188→   188→interface DashboardStats {
+   189→   189→  activeBookings: number;
+   190→   190→  totalOrders: number;
+   191→   191→  savedByRenting: number;
+   192→   192→  aiSuggestions: number;
+   193→   193→  recentBookings: AppBooking[];
+   194→   194→}
+   195→   195→
+   196→   196→function OverviewTab({ stats, onViewAll }: { stats: DashboardStats | null; onViewAll: () => void }) {
+   197→   197→  if (!stats) return <OverviewSkeleton />;
+   198→   198→
+   199→   199→  const statCards = [
+   200→   200→    {
+   201→   201→      icon: <Package className="h-5 w-5" />,
+   202→   202→      value: stats.activeBookings,
+   203→   203→      label: "Active Bookings",
+   204→   204→      color: "text-primary",
+   205→   205→      bg: "bg-primary/10",
+   206→   206→    },
+   207→   207→    {
+   208→   208→      icon: <Calendar className="h-5 w-5" />,
+   209→   209→      value: stats.totalOrders,
+   210→   210→      label: "Total Orders",
+   211→   211→      color: "text-emerald-600",
+   212→   212→      bg: "bg-emerald-100 dark:bg-emerald-900/30",
+   213→   213→    },
+   214→   214→    {
+   215→   215→      icon: <DollarSign className="h-5 w-5" />,
+   216→   216→      value: formatINR(stats.savedByRenting),
+   217→   217→      label: "Saved by Renting",
+   218→   218→      color: "text-amber-600",
+   219→   219→      bg: "bg-amber-100 dark:bg-amber-900/30",
+   220→   220→    },
+   221→   221→    {
+   222→   222→      icon: <Sparkles className="h-5 w-5" />,
+   223→   223→      value: stats.aiSuggestions,
+   224→   224→      label: "AI Suggestions",
+   225→   225→      color: "text-violet-600",
+   226→   226→      bg: "bg-violet-100 dark:bg-violet-900/30",
+   227→   227→    },
+   228→   228→  ];
+   229→   229→
+   230→   230→  return (
+   231→   231→    <motion.div {...tabAnimation} className="space-y-6">
+   232→   232→      {/* Stat Cards */}
+   233→   233→      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+   234→   234→        {statCards.map((card, i) => (
+   235→   235→          <Card key={i} className="p-4 card-hover">
+   236→   236→            <div className="flex items-center gap-4">
+   237→   237→              <div className={`flex h-10 w-10 items-center justify-center rounded-lg ${card.bg} ${card.color}`}>
+   238→   238→                {card.icon}
+   239→   239→              </div>
+   240→   240→              <div>
+   241→   241→                <p className="text-2xl font-bold leading-tight">{card.value}</p>
+   242→   242→                <p className="text-xs text-muted-foreground">{card.label}</p>
+   243→   243→              </div>
+   244→   244→            </div>
+   245→   245→          </Card>
+   246→   246→        ))}
+   247→   247→      </div>
+   248→   248→
+   249→   249→      {/* Recent Bookings */}
+   250→   250→      <Card>
+   251→   251→        <CardHeader className="pb-3">
+   252→   252→          <div className="flex items-center justify-between">
+   253→   253→            <CardTitle className="text-base font-semibold">Recent Bookings</CardTitle>
+   254→   254→            {stats.recentBookings.length > 0 && (
+   255→   255→              <Button variant="ghost" size="sm" onClick={onViewAll} className="text-xs text-primary hover:text-primary/80">
+   256→   256→                View All Bookings
+   257→   257→              </Button>
+   258→   258→            )}
+   259→   259→          </div>
+   260→   260→        </CardHeader>
+   261→   261→        <CardContent>
+   262→   262→          {stats.recentBookings.length === 0 ? (
+   263→   263→            <p className="text-sm text-muted-foreground py-8 text-center">No bookings yet</p>
+   264→   264→          ) : (
+   265→   265→            <div className="overflow-x-auto">
+   266→   266→              <Table>
+   267→   267→                <TableHeader>
+   268→   268→                  <TableRow>
+   269→   269→                    <TableHead>Product</TableHead>
+   270→   270→                    <TableHead>Type</TableHead>
+   271→   271→                    <TableHead>Status</TableHead>
+   272→   272→                    <TableHead className="text-right">Amount</TableHead>
+   273→   273→                    <TableHead className="text-right">Date</TableHead>
+   274→   274→                  </TableRow>
+   275→   275→                </TableHeader>
+   276→   276→                <TableBody>
+   277→   277→                  {stats.recentBookings.map((b) => (
+   278→   278→                    <TableRow key={b.id}>
+   279→   279→                      <TableCell className="font-medium max-w-[200px] truncate">{b.product?.title || "—"}</TableCell>
+   280→   280→                      <TableCell>
+   281→   281→                        <span className={`inline-flex items-center rounded-md px-2 py-0.5 text-[11px] font-medium ${BOOKING_TYPE_COLORS[b.bookingType]}`}>
+   282→   282→                          {b.bookingType}
+   283→   283→                        </span>
+   284→   284→                      </TableCell>
+   285→   285→                      <TableCell>
+   286→   286→                        <span className={`inline-flex items-center rounded-md px-2 py-0.5 text-[11px] font-medium ${BOOKING_STATUS_COLORS[b.status]}`}>
+   287→   287→                          {b.status}
+   288→   288→                        </span>
+   289→   289→                      </TableCell>
+   290→   290→                      <TableCell className="text-right font-medium">{formatINR(b.totalPrice)}</TableCell>
+   291→   291→                      <TableCell className="text-right text-muted-foreground text-xs">{formatDate(b.createdAt)}</TableCell>
+   292→   292→                    </TableRow>
+   293→   293→                  ))}
+   294→   294→                </TableBody>
+   295→   295→              </Table>
+   296→   296→            </div>
+   297→   297→          )}
+   298→   298→        </CardContent>
+   299→   299→      </Card>
+   300→   300→    </motion.div>
+   301→   301→  );
+   302→   302→}
+   303→   303→
+   304→   304→// --- Bookings Tab ---
+   305→   305→
+   306→   306→function BookingsTab() {
+   307→   307→  const { token } = useAppStore();
+   308→   308→  const [bookings, setBookings] = useState<AppBooking[]>([]);
+   309→   309→  const [loading, setLoading] = useState(true);
+   310→   310→  const [statusFilter, setStatusFilter] = useState<string>("ALL");
+   311→   311→  const [typeFilter, setTypeFilter] = useState<string>("ALL");
+   312→   312→  const [page, setPage] = useState(1);
+   313→   313→  const [totalPages, setTotalPages] = useState(1);
+   314→   314→  const [expandedId, setExpandedId] = useState<string | null>(null);
+   315→   315→  const [cancellingId, setCancellingId] = useState<string | null>(null);
+   316→   316→
+   317→   317→  const fetchBookings = useCallback(async () => {
+   318→   318→    if (!token) return;
+   319→   319→    setLoading(true);
+   320→   320→    try {
+   321→   321→      const params = new URLSearchParams({ page: String(page) });
+   322→   322→      if (statusFilter !== "ALL") params.set("status", statusFilter);
+   323→   323→      if (typeFilter !== "ALL") params.set("type", typeFilter);
+   324→   324→      const res = await fetch(`/api/bookings?${params}`, {
+   325→   325→        headers: { Authorization: `Bearer ${token}` },
+   326→   326→      });
+   327→   327→      if (!res.ok) throw new Error("Failed to fetch bookings");
+   328→   328→      const data = await res.json();
+   329→   329→      setBookings(data.bookings || []);
+   330→   330→      setTotalPages(data.totalPages || 1);
+   331→   331→    } catch {
+   332→   332→      toast.error("Failed to load bookings");
+   333→   333→    } finally {
+   334→   334→      setLoading(false);
+   335→   335→    }
+   336→   336→  }, [token, statusFilter, typeFilter, page]);
+   337→   337→
+   338→   338→  useEffect(() => {
+   339→   339→    fetchBookings();
+   340→   340→  }, [fetchBookings]);
+   341→   341→
+   342→   342→  const handleCancel = async () => {
+   343→   343→    if (!cancellingId || !token) return;
+   344→   344→    try {
+   345→   345→      const res = await fetch(`/api/bookings/${cancellingId}`, {
+   346→   346→        method: "PUT",
+   347→   347→        headers: {
+   348→   348→          "Content-Type": "application/json",
+   349→   349→          Authorization: `Bearer ${token}`,
+   350→   350→        },
+   351→   351→        body: JSON.stringify({ status: "CANCELLED" }),
+   352→   352→      });
+   353→   353→      if (!res.ok) throw new Error("Failed to cancel booking");
+   354→   354→      toast.success("Booking cancelled successfully");
+   355→   355→      setExpandedId(null);
+   356→   356→      fetchBookings();
+   357→   357→    } catch {
+   358→   358→      toast.error("Failed to cancel booking");
+   359→   359→    } finally {
+   360→   360→      setCancellingId(null);
+   361→   361→    }
+   362→   362→  };
+   363→   363→
+   364→   364→  if (loading) return <BookingsSkeleton />;
+   365→   365→
+   366→   366→  return (
+   367→   367→    <motion.div {...tabAnimation} className="space-y-4">
+   368→   368→      {/* Filters */}
+   369→   369→      <div className="flex flex-wrap gap-3 items-center">
+   370→   370→        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+   371→   371→          <Filter className="h-4 w-4" />
+   372→   372→          <span className="font-medium">Filters:</span>
+   373→   373→        </div>
+   374→   374→        <Select value={statusFilter} onValueChange={(v) => { setStatusFilter(v); setPage(1); }}>
+   375→   375→          <SelectTrigger size="sm" className="w-[160px]">
+   376→   376→            <SelectValue placeholder="Status" />
+   377→   377→          </SelectTrigger>
+   378→   378→          <SelectContent>
+   379→   379→            <SelectItem value="ALL">All Statuses</SelectItem>
+   380→   380→            <SelectItem value="PENDING">Pending</SelectItem>
+   381→   381→            <SelectItem value="APPROVED">Approved</SelectItem>
+   382→   382→            <SelectItem value="CONFIRMED">Confirmed</SelectItem>
+   383→   383→            <SelectItem value="DELIVERED">Delivered</SelectItem>
+   384→   384→            <SelectItem value="RETURNED">Returned</SelectItem>
+   385→   385→            <SelectItem value="COMPLETED">Completed</SelectItem>
+   386→   386→            <SelectItem value="CANCELLED">Cancelled</SelectItem>
+   387→   387→            <SelectItem value="REJECTED">Rejected</SelectItem>
+   388→   388→          </SelectContent>
+   389→   389→        </Select>
+   390→   390→        <Select value={typeFilter} onValueChange={(v) => { setTypeFilter(v); setPage(1); }}>
+   391→   391→          <SelectTrigger size="sm" className="w-[140px]">
+   392→   392→            <SelectValue placeholder="Type" />
+   393→   393→          </SelectTrigger>
+   394→   394→          <SelectContent>
+   395→   395→            <SelectItem value="ALL">All Types</SelectItem>
+   396→   396→            <SelectItem value="RENT">Rent</SelectItem>
+   397→   397→            <SelectItem value="BUY">Buy</SelectItem>
+   398→   398→            <SelectItem value="BOOK">Book</SelectItem>
+   399→   399→          </SelectContent>
+   400→   400→        </Select>
+   401→   401→      </div>
+   402→   402→
+   403→   403→      {/* Booking List */}
+   404→   404→      {bookings.length === 0 ? (
+   405→   405→        <Card>
+   406→   406→          <CardContent className="py-12 text-center">
+   407→   407→            <Package className="h-10 w-10 mx-auto text-muted-foreground/40 mb-3" />
+   408→   408→            <p className="text-sm text-muted-foreground">No bookings found</p>
+   409→   409→          </CardContent>
+   410→   410→        </Card>
+   411→   411→      ) : (
+   412→   412→        <div className="space-y-3">
+   413→   413→          {bookings.map((b) => (
+   414→   414→            <Card key={b.id} className="overflow-hidden">
+   415→   415→              <button
+   416→   416→                className="w-full text-left"
+   417→   417→                onClick={() => setExpandedId(expandedId === b.id ? null : b.id)}
+   418→   418→              >
+   419→   419→                <div className="flex items-center gap-4 p-4">
+   420→   420→                  {/* Product Image */}
+   421→   421→                  <div className="h-14 w-14 rounded-lg bg-muted flex-shrink-0 overflow-hidden">
+   422→   422→                    {(() => {
+   423→   423→                      let imgSrc = b.product?.imageUrl || null;
+   424→   424→                      if (b.product && "images" in b.product && b.product.images) {
+   425→   425→                        try {
+   426→   426→                          const parsed = JSON.parse(b.product.images as string);
+   427→   427→                          if (Array.isArray(parsed) && parsed.length > 0) imgSrc = parsed[0];
+   428→   428→                        } catch { /* ignore */ }
+   429→   429→                      }
+   430→   430→                      return imgSrc ? (
+   431→   431→                        <img src={imgSrc} alt="" className="h-full w-full object-cover" />
+   432→   432→                      ) : (
+   433→   433→                        <div className="h-full w-full flex items-center justify-center text-muted-foreground">
+   434→   434→                          <Package className="h-5 w-5" />
+   435→   435→                        </div>
+   436→   436→                      );
+   437→   437→                    })()}
+   438→   438→                  </div>
+   439→   439→                  {/* Info */}
+   440→   440→                  <div className="flex-1 min-w-0">
+   441→   441→                    <p className="font-medium text-sm truncate">{b.product?.title || "—"}</p>
+   442→   442→                    <div className="flex items-center gap-2 mt-1">
+   443→   443→                      <span className={`inline-flex items-center rounded-md px-1.5 py-0.5 text-[10px] font-medium ${BOOKING_TYPE_COLORS[b.bookingType]}`}>
+   444→   444→                        {b.bookingType}
+   445→   445→                      </span>
+   446→   446→                      <span className="text-xs text-muted-foreground">
+   447→   447→                        {b.startDate && b.endDate
+   448→   448→                          ? `${formatDate(b.startDate)} – ${formatDate(b.endDate)}`
+   449→   449→                          : formatDate(b.createdAt)}
+   450→   450→                      </span>
+   451→   451→                    </div>
+   452→   452→                  </div>
+   453→   453→                  {/* Amount & Status */}
+   454→   454→                  <div className="text-right flex-shrink-0">
+   455→   455→                    <p className="font-semibold text-sm">{formatINR(b.totalPrice)}</p>
+   456→   456→                    <span className={`inline-flex items-center rounded-md px-1.5 py-0.5 text-[10px] font-medium mt-1 ${BOOKING_STATUS_COLORS[b.status]}`}>
+   457→   457→                      {b.status}
+   458→   458→                    </span>
+   459→   459→                  </div>
+   460→   460→                  {/* Expand Icon */}
+   461→   461→                  <div className="flex-shrink-0 text-muted-foreground">
+   462→   462→                    {expandedId === b.id ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+   463→   463→                  </div>
+   464→   464→                </div>
+   465→   465→              </button>
+   466→   466→
+   467→   467→              {/* Expanded Details */}
+   468→   468→              <AnimatePresence>
+   469→   469→                {expandedId === b.id && (
+   470→   470→                  <motion.div
+   471→   471→                    initial={{ height: 0, opacity: 0 }}
+   472→   472→                    animate={{ height: "auto", opacity: 1 }}
+   473→   473→                    exit={{ height: 0, opacity: 0 }}
+   474→   474→                    transition={{ duration: 0.2 }}
+   475→   475→                    className="overflow-hidden"
+   476→   476→                  >
+   477→   477→                    <Separator />
+   478→   478→                    <div className="p-4 bg-muted/30 space-y-3">
+   479→   479→                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
+   480→   480→                        <div>
+   481→   481→                          <p className="text-muted-foreground text-xs mb-0.5">Quantity</p>
+   482→   482→                          <p className="font-medium">{b.quantity}</p>
+   483→   483→                        </div>
+   484→   484→                        <div>
+   485→   485→                          <p className="text-muted-foreground text-xs mb-0.5">Deposit</p>
+   486→   486→                          <p className="font-medium">{formatINR(b.depositAmount)}</p>
+   487→   487→                        </div>
+   488→   488→                        <div>
+   489→   489→                          <p className="text-muted-foreground text-xs mb-0.5">Payment</p>
+   490→   490→                          <p className="font-medium capitalize">{b.payment?.paymentStatus || "—"}</p>
+   491→   491→                        </div>
+   492→   492→                        <div>
+   493→   493→                          <p className="text-muted-foreground text-xs mb-0.5">Booked On</p>
+   494→   494→                          <p className="font-medium">{formatDate(b.createdAt)}</p>
+   495→   495→                        </div>
+   496→   496→                      </div>
+   497→   497→                      {b.notes && (
+   498→   498→                        <p className="text-sm text-muted-foreground">
+   499→   499→                          <span className="font-medium text-foreground">Notes: </span>{b.notes}
+   500→   500→                        </p>
+   501→   501→                      )}
+   502→   502→                      {b.status === "PENDING" && (
+   503→   503→                        <Button
+   504→   504→                          variant="destructive"
+   505→   505→                          size="sm"
+   506→   506→                          onClick={() => setCancellingId(b.id)}
+   507→   507→                          className="mt-2"
+   508→   508→                        >
+   509→   509→                          <XCircle className="h-4 w-4 mr-1.5" />
+   510→   510→                          Cancel Booking
+   511→   511→                        </Button>
+   512→   512→                      )}
+   513→   513→                    </div>
+   514→   514→                  </motion.div>
+   515→   515→                )}
+   516→   516→              </AnimatePresence>
+   517→   517→            </Card>
+   518→   518→          ))}
+   519→   519→        </div>
+   520→   520→      )}
+   521→   521→
+   522→   522→      {/* Pagination */}
+   523→   523→      {totalPages > 1 && (
+   524→   524→        <div className="flex items-center justify-center gap-2 pt-4">
+   525→   525→          <Button
+   526→   526→            variant="outline"
+   527→   527→            size="sm"
+   528→   528→            disabled={page <= 1}
+   529→   529→            onClick={() => setPage((p) => p - 1)}
+   530→   530→          >
+   531→   531→            Previous
+   532→   532→          </Button>
+   533→   533→          <span className="text-sm text-muted-foreground">
+   534→   534→            Page {page} of {totalPages}
+   535→   535→          </span>
+   536→   536→          <Button
+   537→   537→            variant="outline"
+   538→   538→            size="sm"
+   539→   539→            disabled={page >= totalPages}
+   540→   540→            onClick={() => setPage((p) => p + 1)}
+   541→   541→          >
+   542→   542→            Next
+   543→   543→          </Button>
+   544→   544→        </div>
+   545→   545→      )}
+   546→   546→
+   547→   547→      {/* Cancel Dialog */}
+   548→   548→      <AlertDialog open={!!cancellingId} onOpenChange={(open) => !open && setCancellingId(null)}>
+   549→   549→        <AlertDialogContent>
+   550→   550→          <AlertDialogHeader>
+   551→   551→            <AlertDialogTitle>Cancel Booking</AlertDialogTitle>
+   552→   552→            <AlertDialogDescription>
+   553→   553→              Are you sure you want to cancel this booking? This action cannot be undone.
+   554→   554→            </AlertDialogDescription>
+   555→   555→          </AlertDialogHeader>
+   556→   556→          <AlertDialogFooter>
+   557→   557→            <AlertDialogCancel>Keep Booking</AlertDialogCancel>
+   558→   558→            <AlertDialogAction onClick={handleCancel} className="bg-destructive text-white hover:bg-destructive/90">
+   559→   559→              Cancel Booking
+   560→   560→            </AlertDialogAction>
+   561→   561→          </AlertDialogFooter>
+   562→   562→        </AlertDialogContent>
+   563→   563→      </AlertDialog>
+   564→   564→    </motion.div>
+   565→   565→  );
+   566→   566→}
+   567→   567→
+   568→   568→// --- Reviews Tab ---
+   569→   569→
+   570→   570→function ReviewsTab({ reviews }: { reviews: Array<{ productTitle: string; rating: number; comment?: string; createdAt: string }> | null }) {
+   571→   571→  if (!reviews) return <ReviewsSkeleton />;
+   572→   572→
+   573→   573→  if (reviews.length === 0) {
+   574→   574→    return (
+   575→   575→      <motion.div {...tabAnimation}>
+   576→   576→        <Card>
+   577→   577→          <CardContent className="py-12 text-center">
+   578→   578→            <Star className="h-10 w-10 mx-auto text-muted-foreground/40 mb-3" />
+   579→   579→            <p className="text-sm text-muted-foreground">No reviews yet</p>
+   580→   580→          </CardContent>
+   581→   581→        </Card>
+   582→   582→      </motion.div>
+   583→   583→    );
+   584→   584→  }
+   585→   585→
+   586→   586→  return (
+   587→   587→    <motion.div {...tabAnimation} className="space-y-4">
+   588→   588→      {reviews.map((r, i) => (
+   589→   589→        <Card key={i} className="card-hover">
+   590→   590→          <CardContent className="p-4">
+   591→   591→            <div className="flex items-start justify-between gap-4">
+   592→   592→              <div className="flex-1 min-w-0">
+   593→   593→                <p className="font-medium text-sm">{r.productTitle}</p>
+   594→   594→                <div className="flex items-center gap-1 mt-1">
+   595→   595→                  {[1, 2, 3, 4, 5].map((s) => (
+   596→   596→                    <Star
+   597→   597→                      key={s}
+   598→   598→                      className={`h-3.5 w-3.5 ${s <= r.rating ? "fill-amber-400 text-amber-400" : "text-muted-foreground/30"}`}
+   599→   599→                    />
+   600→   600→                  ))}
+   601→   601→                </div>
+   602→   602→                {r.comment && (
+   603→   603→                  <p className="text-sm text-muted-foreground mt-2 leading-relaxed">{r.comment}</p>
+   604→   604→                )}
+   605→   605→              </div>
+   606→   606→              <p className="text-xs text-muted-foreground flex-shrink-0">{formatDate(r.createdAt)}</p>
+   607→   607→            </div>
+   608→   608→          </CardContent>
+   609→   609→        </Card>
+   610→   610→      ))}
+   611→   611→    </motion.div>
+   612→   612→  );
+   613→   613→}
+   614→   614→
+   615→   615→// --- AI History Tab ---
+   616→   616→
+   617→   617→function AIHistoryTab({ aiHistory }: { aiHistory: AIRecommendationResult[] | null }) {
+   618→   618→  if (!aiHistory) return <AIHistorySkeleton />;
+   619→   619→
+   620→   620→  if (aiHistory.length === 0) {
+   621→   621→    return (
+   622→   622→      <motion.div {...tabAnimation}>
+   623→   623→        <Card>
+   624→   624→          <CardContent className="py-12 text-center">
+   625→   625→            <Sparkles className="h-10 w-10 mx-auto text-muted-foreground/40 mb-3" />
+   626→   626→            <p className="text-sm text-muted-foreground">No AI recommendations yet</p>
+   627→   627→            <p className="text-xs text-muted-foreground mt-1">Try the AI recommendation tool on any product page!</p>
+   628→   628→          </CardContent>
+   629→   629→        </Card>
+   630→   630→      </motion.div>
+   631→   631→    );
+   632→   632→  }
+   633→   633→
+   634→   634→  const getRecommendationColor = (rec: string) => {
+   635→   635→    if (rec.toUpperCase().includes("RENT")) return BOOKING_TYPE_COLORS.RENT;
+   636→   636→    if (rec.toUpperCase().includes("BUY")) return BOOKING_TYPE_COLORS.BUY;
+   637→   637→    if (rec.toUpperCase().includes("BOOK")) return BOOKING_TYPE_COLORS.BOOK;
+   638→   638→    return "bg-slate-100 text-slate-700 dark:bg-slate-900/30 dark:text-slate-400";
+   639→   639→  };
+   640→   640→
+   641→   641→  return (
+   642→   642→    <motion.div {...tabAnimation} className="space-y-4">
+   643→   643→      {aiHistory.map((item) => (
+   644→   644→        <Card key={item.id} className="card-hover">
+   645→   645→          <CardContent className="p-4 space-y-3">
+   646→   646→            <div className="flex items-start justify-between gap-3">
+   647→   647→              <div className="flex items-center gap-2 flex-shrink-0">
+   648→   648→                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-violet-100 dark:bg-violet-900/30">
+   649→   649→                  <Sparkles className="h-4 w-4 text-violet-600" />
+   650→   650→                </div>
+   651→   651→                <span className={`inline-flex items-center rounded-md px-2 py-0.5 text-[11px] font-medium ${getRecommendationColor(item.recommendation)}`}>
+   652→   652→                  {item.recommendation}
+   653→   653→                </span>
+   654→   654→              </div>
+   655→   655→              <p className="text-xs text-muted-foreground flex-shrink-0">{formatDate(item.createdAt)}</p>
+   656→   656→            </div>
+   657→   657→            <div>
+   658→   658→              <p className="text-sm font-medium flex items-center gap-1.5">
+   659→   659→                <Lightbulb className="h-3.5 w-3.5 text-amber-500" />
+   660→   660→                Recommendation
+   661→   661→              </p>
+   662→   662→              <p className="text-sm text-muted-foreground mt-1 leading-relaxed">{item.explanation}</p>
+   663→   663→            </div>
+   664→   664→            {item.savings != null && item.savings > 0 && (
+   665→   665→              <div className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400">
+   666→   666→                <TrendingDown className="h-4 w-4" />
+   667→   667→                <span className="text-sm font-semibold">Savings: {formatINR(item.savings)}</span>
+   668→   668→              </div>
+   669→   669→            )}
+   670→   670→            {item.alternatives && (
+   671→   671→              <p className="text-xs text-muted-foreground">
+   672→   672→                <span className="font-medium">Alternatives: </span>{item.alternatives}
+   673→   673→              </p>
+   674→   674→            )}
+   675→   675→          </CardContent>
+   676→   676→        </Card>
+   677→   677→      ))}
+   678→   678→    </motion.div>
+   679→   679→  );
+   680→   680→}
+   681→   681→
+   682→   682→// --- Main Component ---
+   683→   683→
+   684→   684→export default function CustomerDashboard() {
+   685→   685→  const { customerTab, setCustomerTab, navigateTo } = useAppStore();
+   686→   686→  const { token } = useAppStore();
+   687→   687→  const [dashboardData, setDashboardData] = useState<{
+   688→   688→    activeBookings: number;
+   689→   689→    totalOrders: number;
+   690→   690→    savedByRenting: number;
+   691→   691→    aiSuggestions: number;
+   692→   692→    recentBookings: AppBooking[];
+   693→   693→    reviews: Array<{ productTitle: string; rating: number; comment?: string; createdAt: string }>;
+   694→   694→    aiHistory: AIRecommendationResult[];
+   695→   695→  } | null>(null);
+   696→   696→  const [loading, setLoading] = useState(true);
+   697→   697→
+   698→   698→  useEffect(() => {
+   699→   699→    if (!token) return;
+   700→   700→    async function fetchDashboard() {
+   701→   701→      try {
+   702→   702→        const res = await fetch("/api/customer/dashboard", {
+   703→   703→          headers: { Authorization: `Bearer ${token}` },
+   704→   704→        });
+   705→   705→        if (!res.ok) throw new Error("Failed to fetch dashboard");
+   706→   706→        const data = await res.json();
+   707→   707→        setDashboardData(data);
+   708→   708→      } catch {
+   709→   709→        toast.error("Failed to load dashboard data");
+   710→   710→      } finally {
+   711→   711→        setLoading(false);
+   712→   712→      }
+   713→   713→    }
+   714→   714→    fetchDashboard();
+   715→   715→  }, [token]);
+   716→   716→
+   717→   717→  return (
+   718→   718→    <div className="space-y-6">
+   719→   719→      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+   720→   720→        <div>
+   721→   721→          <h2 className="text-2xl font-bold tracking-tight">Customer Dashboard</h2>
+   722→   722→          <p className="text-sm text-muted-foreground mt-1">Manage your bookings, reviews, and AI-powered recommendations</p>
+   723→   723→        </div>
+   724→   724→        <Button
+   725→   725→          variant="outline"
+   726→   726→          size="sm"
+   727→   727→          onClick={() => navigateTo("marketplace")}
+   728→   728→          className="gap-2 rounded-full self-start"
+   729→   729→        >
+   730→   730→          <ArrowLeft className="h-4 w-4" />
+   731→   731→          Back to Marketplace
+   732→   732→        </Button>
+   733→   733→      </div>
+   734→   734→
+   735→   735→      <Tabs
+   736→   736→        value={customerTab}
+   737→   737→        onValueChange={(v) => setCustomerTab(v as typeof customerTab)}
+   738→   738→        className="w-full"
+   739→   739→      >
+   740→   740→        <TabsList className="flex-wrap h-auto gap-1 p-1">
+   741→   741→          <TabsTrigger value="overview" className="text-xs sm:text-sm">
+   742→   742→            <Eye className="h-3.5 w-3.5 sm:mr-1.5" />
+   743→   743→            <span className="hidden sm:inline">Overview</span>
+   744→   744→          </TabsTrigger>
+   745→   745→          <TabsTrigger value="bookings" className="text-xs sm:text-sm">
+   746→   746→            <Calendar className="h-3.5 w-3.5 sm:mr-1.5" />
+   747→   747→            <span className="hidden sm:inline">Bookings</span>
+   748→   748→          </TabsTrigger>
+   749→   749→          <TabsTrigger value="reviews" className="text-xs sm:text-sm">
+   750→   750→            <Star className="h-3.5 w-3.5 sm:mr-1.5" />
+   751→   751→            <span className="hidden sm:inline">Reviews</span>
+   752→   752→          </TabsTrigger>
+   753→   753→          <TabsTrigger value="ai-history" className="text-xs sm:text-sm">
+   754→   754→            <Sparkles className="h-3.5 w-3.5 sm:mr-1.5" />
+   755→   755→            <span className="hidden sm:inline">AI History</span>
+   756→   756→          </TabsTrigger>
+   757→   757→        </TabsList>
+   758→   758→
+   759→   759→        <AnimatePresence mode="wait">
+   760→   760→          {customerTab === "overview" && (
+   761→   761→            <TabsContent value="overview">
+   762→   762→              <OverviewTab
+   763→   763→                stats={loading ? null : dashboardData}
+   764→   764→                onViewAll={() => setCustomerTab("bookings")}
+   765→   765→              />
+   766→   766→            </TabsContent>
+   767→   767→          )}
+   768→   768→          {customerTab === "bookings" && (
+   769→   769→            <TabsContent value="bookings">
+   770→   770→              <BookingsTab />
+   771→   771→            </TabsContent>
+   772→   772→          )}
+   773→   773→          {customerTab === "reviews" && (
+   774→   774→            <TabsContent value="reviews">
+   775→   775→              <ReviewsTab reviews={loading ? null : dashboardData?.reviews || null} />
+   776→   776→            </TabsContent>
+   777→   777→          )}
+   778→   778→          {customerTab === "ai-history" && (
+   779→   779→            <TabsContent value="ai-history">
+   780→   780→              <AIHistoryTab aiHistory={loading ? null : dashboardData?.aiHistory || null} />
+   781→   781→            </TabsContent>
+   782→   782→          )}
+   783→   783→        </AnimatePresence>
+   784→   784→      </Tabs>
+   785→   785→    </div>
+   786→   786→  );
+   787→   787→}

@@ -133,10 +133,11 @@ export type AppView =
   | "customer-dashboard"
   | "vendor-dashboard"
   | "admin-dashboard"
-  | "booking-detail";
+  | "booking-detail"
+  | "ai-event-planner";
 
 export interface DashboardTab {
-  customer: "overview" | "bookings" | "reviews" | "ai-history";
+  customer: "overview" | "bookings" | "reviews" | "ai-history" | "event-plans";
   vendor: "overview" | "products" | "bookings" | "add-product" | "edit-product" | "analytics";
   admin: "overview" | "users" | "vendors" | "products" | "bookings";
 }
@@ -160,3 +161,55 @@ export const BOOKING_TYPE_COLORS: Record<BookingType, string> = {
   BUY: "bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400",
   BOOK: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400",
 };
+
+// AI Event Planning types
+export interface AIPackageItem {
+  productId?: string | null;
+  productName: string;
+  category?: string;
+  quantity: number;
+  rentPerDay: number;
+  duration: number;
+  subtotal: number;
+  deposit: number;
+  vendorId?: string | null;
+  vendorName?: string | null;
+  vendorRating?: number;
+  priority: string;
+  reason?: string;
+}
+
+export interface AITierPackage {
+  tier: string;
+  name: string;
+  description?: string;
+  totalCost: number;
+  totalDeposit: number;
+  items: AIPackageItem[];
+}
+
+export interface AIEventPlanResult {
+  id: string;
+  eventType: string;
+  guests: number;
+  budget: number;
+  duration: number;
+  packages: {
+    economy?: AITierPackage;
+    standard?: AITierPackage;
+    premium?: AITierPackage;
+  };
+  upsells: Array<{ name: string; reason: string; estimatedCost: number; category?: string }>;
+  tips: string[];
+}
+
+export interface SavedEventPlan {
+  id: string;
+  eventType: string;
+  guests: number;
+  budget: number;
+  status: string;
+  selectedTier?: string | null;
+  createdAt: string;
+  _count?: { packageBookings: number };
+}

@@ -11,6 +11,7 @@ import ProductDetailView from "@/components/marketplace/ProductDetailView";
 import CustomerDashboard from "@/components/dashboard/CustomerDashboard";
 import VendorDashboard from "@/components/dashboard/VendorDashboard";
 import AdminDashboard from "@/components/dashboard/AdminDashboard";
+import AIEventPlannerView from "@/components/marketplace/AIEventPlannerView";
 
 function DashboardLoader() {
   const { user } = useAppStore();
@@ -86,6 +87,18 @@ export default function Home() {
               transition={{ duration: 0.2 }}
             >
               <ProductDetailView />
+            </motion.div>
+          )}
+
+          {currentView === "ai-event-planner" && (
+            <motion.div
+              key="ai-event-planner"
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              transition={{ duration: 0.2 }}
+            >
+              <AIEventPlannerView />
             </motion.div>
           )}
 

@@ -9,6 +9,12 @@ import {
   X,
   PackageOpen,
   Store,
+  Package,
+  ShieldCheck,
+  Wallet,
+  CalendarCheck,
+  ArrowRight,
+  ChevronRight,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -42,7 +48,6 @@ import { Separator } from "@/components/ui/separator";
 import { Label } from "@/components/ui/label";
 import { useAppStore } from "@/stores/app-store";
 import ProductCard, { ProductCardSkeleton } from "./ProductCard";
-import EventPlannerDialog from "./EventPlannerDialog";
 import HeroSection from "./HeroSection";
 import CategoriesShowcase from "./CategoriesShowcase";
 import HowItWorks from "./HowItWorks";
@@ -90,16 +95,6 @@ export default function MarketplaceView() {
 
   // Mobile filter sheet
   const [filterSheetOpen, setFilterSheetOpen] = useState(false);
-
-  // Event planner dialog
-  const [eventPlannerOpen, setEventPlannerOpen] = useState(false);
-
-  // Listen for open-event-planner events from Footer
-  useEffect(() => {
-    const handler = () => setEventPlannerOpen(true);
-    window.addEventListener("open-event-planner", handler);
-    return () => window.removeEventListener("open-event-planner", handler);
-  }, []);
 
   // Listen for search events from Navbar / Hero
   useEffect(() => {
@@ -363,6 +358,84 @@ export default function MarketplaceView() {
 
       {!isVendor && <CategoriesShowcase />}
 
+      {/* AI Event Planning CTA Section */}
+      {!isVendor && (
+        <section className="relative overflow-hidden border-y bg-gradient-to-r from-primary/8 via-amber-50/60 to-primary/5 dark:from-primary/5 dark:via-amber-950/20 dark:to-primary/5">
+          <div className="absolute top-0 right-0 w-[300px] h-[300px] rounded-full bg-gradient-to-bl from-amber-200/20 to-transparent blur-3xl dark:from-amber-900/10" />
+          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-12 sm:py-16 relative">
+            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-8">
+              <div className="max-w-xl">
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ duration: 0.5 }}
+                >
+                  <Badge variant="outline" className="mb-4 border-primary/30 text-primary gap-1.5">
+                    <Sparkles className="h-3 w-3" />
+                    AI-Powered
+                  </Badge>
+                  <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-foreground leading-tight">
+                    Plan My Event{" "}
+                    <span className="bg-gradient-to-r from-primary via-amber-600 to-orange-500 bg-clip-text text-transparent">
+                      with AI
+                    </span>
+                  </h2>
+                  <p className="mt-3 text-muted-foreground text-base sm:text-lg leading-relaxed">
+                    Tell us about your event and our AI will build custom equipment packages from our marketplace inventory — with real products, real vendors, and real prices.
+                  </p>
+                </motion.div>
+
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ duration: 0.5, delay: 0.1 }}
+                  className="mt-6"
+                >
+                  <Button
+                    size="lg"
+                    className="gap-2 text-base px-6"
+                    onClick={() => navigateTo("ai-event-planner")}
+                  >
+                    Start Planning
+                    <ArrowRight className="h-4 w-4" />
+                  </Button>
+                </motion.div>
+              </div>
+
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.5, delay: 0.2 }}
+                className="grid grid-cols-2 gap-4 lg:gap-5"
+              >
+                {[
+                  { icon: Package, title: "3 Custom Packages", desc: "Economy, Standard & Premium tiers" },
+                  { icon: ShieldCheck, title: "Real Inventory", desc: "Matched from marketplace products" },
+                  { icon: Wallet, title: "Budget Optimized", desc: "Stay within your event budget" },
+                  { icon: CalendarCheck, title: "One-Click Booking", desc: "Book entire package instantly" },
+                ].map((feature, i) => (
+                  <div
+                    key={i}
+                    className="flex items-start gap-3 p-4 rounded-xl bg-card/70 backdrop-blur-sm border border-border/50 hover:border-primary/30 transition-premium"
+                  >
+                    <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                      <feature.icon className="h-5 w-5 text-primary" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-semibold">{feature.title}</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">{feature.desc}</p>
+                    </div>
+                  </div>
+                ))}
+              </motion.div>
+            </div>
+          </div>
+        </section>
+      )}
+
       {isVendor && (
         <div className="bg-primary/5 border-b">
           <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-6">
@@ -396,7 +469,7 @@ export default function MarketplaceView() {
             </div>
             {!isVendor && (
               <Button
-                onClick={() => setEventPlannerOpen(true)}
+                onClick={() => navigateTo("ai-event-planner")}
                 className="gap-2 rounded-full self-start sm:self-auto"
               >
                 <Sparkles className="h-4 w-4" />
@@ -698,8 +771,6 @@ export default function MarketplaceView() {
       {/* 5. Why RentWise */}
       {!isVendor && <WhyRentWise />}
 
-      {/* Event Planner Dialog */}
-      <EventPlannerDialog open={eventPlannerOpen} onOpenChange={setEventPlannerOpen} />
     </div>
   );
 }

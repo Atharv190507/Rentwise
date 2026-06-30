@@ -23,7 +23,7 @@ export default function Footer() {
     } else if (action === "vendor") {
       openAuthDialog("vendor-register");
     } else if (action === "planner") {
-      window.dispatchEvent(new CustomEvent("open-event-planner"));
+      navigateTo("ai-event-planner");
     } else if (action === "how") {
       const el = document.getElementById("how-it-works");
       if (el) el.scrollIntoView({ behavior: "smooth" });

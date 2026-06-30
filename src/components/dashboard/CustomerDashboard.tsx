@@ -63,6 +63,7 @@ import type {
   AIRecommendationResult,
   BookingStatus,
   BookingType,
+  SavedEventPlan,
 } from "@/lib/types";
 import { BOOKING_STATUS_COLORS, BOOKING_TYPE_COLORS } from "@/lib/types";
 
@@ -679,6 +680,175 @@ function AIHistoryTab({ aiHistory }: { aiHistory: AIRecommendationResult[] | nul
   );
 }
 
+// --- Event Plans Tab ---
+
+function EventPlansTab() {
+  const { token, navigateTo } = useAppStore();
+  const [plans, setPlans] = useState<SavedEventPlan[] | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [deleting, setDeleting] = useState<string | null>(null);
+
+  const fetchPlans = useCallback(async () => {
+    if (!token) return;
+    setLoading(true);
+    try {
+      const res = await fetch("/api/event-plans", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setPlans(data);
+      }
+    } catch {
+      // ignore
+    } finally {
+      setLoading(false);
+    }
+  }, [token]);
+
+  useEffect(() => {
+    fetchPlans();
+  }, [fetchPlans]);
+
+  const handleDelete = async (planId: string) => {
+    if (!token) return;
+    if (!window.confirm("Are you sure you want to delete this event plan?")) return;
+    setDeleting(planId);
+    try {
+      const res = await fetch(`/api/event-plans/${planId}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        toast.success("Event plan deleted");
+        fetchPlans();
+      } else {
+        const data = await res.json();
+        toast.error(data.error || "Failed to delete");
+      }
+    } catch {
+      toast.error("Failed to delete");
+    } finally {
+      setDeleting(null);
+    }
+  };
+
+  return (
+    <motion.div {...tabAnimation} className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h3 className="text-lg font-semibold">AI Event Plans</h3>
+          <p className="text-sm text-muted-foreground">Your saved AI-generated event equipment packages</p>
+        </div>
+        <Button
+          className="gap-2"
+          size="sm"
+          onClick={() => navigateTo("ai-event-planner")}
+        >
+          <Sparkles className="h-3.5 w-3.5" />
+          Plan New Event
+        </Button>
+      </div>
+
+      {loading && (
+        <div className="space-y-3">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <Card key={i}>
+              <CardContent className="py-4">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-2">
+                    <Skeleton className="h-4 w-32" />
+                    <Skeleton className="h-3 w-48" />
+                  </div>
+                  <Skeleton className="h-8 w-20" />
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
+
+      {!loading && (!plans || plans.length === 0) && (
+        <div className="flex flex-col items-center justify-center py-16 text-center">
+          <div className="h-16 w-16 rounded-full bg-muted flex items-center justify-center mb-4">
+            <Sparkles className="h-8 w-8 text-muted-foreground" />
+          </div>
+          <h4 className="text-lg font-semibold mb-1">No event plans yet</h4>
+          <p className="text-sm text-muted-foreground mb-4 max-w-sm">
+            Use our AI Event Planner to generate custom equipment packages for your next event.
+          </p>
+          <Button
+            className="gap-2"
+            onClick={() => navigateTo("ai-event-planner")}
+          >
+            <Sparkles className="h-4 w-4" />
+            Plan My Event with AI
+          </Button>
+        </div>
+      )}
+
+      {!loading && plans && plans.length > 0 && (
+        <div className="space-y-3">
+          {plans.map((plan) => (
+            <Card key={plan.id} className="hover:shadow-md transition-premium">
+              <CardContent className="py-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <span className="font-semibold">{plan.eventType}</span>
+                      <Badge
+                        variant="outline"
+                        className={
+                          plan.status === "BOOKED"
+                            ? "text-emerald-600 border-emerald-300 dark:text-emerald-400 dark:border-emerald-700"
+                            : "text-amber-600 border-amber-300 dark:text-amber-400 dark:border-amber-700"
+                        }
+                      >
+                        {plan.status}
+                      </Badge>
+                      {plan.selectedTier && (
+                        <Badge variant="secondary" className="text-xs">
+                          {plan.selectedTier}
+                        </Badge>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                      <span>{plan.guests} guests</span>
+                      <span>Budget: {formatINR(plan.budget)}</span>
+                      <span>{formatDate(plan.createdAt)}</span>
+                      {plan._count && plan._count.packageBookings > 0 && (
+                        <span>{plan._count.packageBookings} booking{plan._count.packageBookings > 1 ? "s" : ""}</span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {plan.status === "DRAFT" && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="gap-1 text-red-600 hover:text-red-700"
+                        disabled={deleting === plan.id}
+                        onClick={() => handleDelete(plan.id)}
+                      >
+                        {deleting === plan.id ? (
+                          <div className="h-3 w-3 border-2 border-red-300 border-t-red-600 rounded-full animate-spin" />
+                        ) : (
+                          <XCircle className="h-3.5 w-3.5" />
+                        )}
+                        Delete
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
+    </motion.div>
+  );
+}
+
 // --- Main Component ---
 
 export default function CustomerDashboard() {
@@ -754,6 +924,10 @@ export default function CustomerDashboard() {
             <Sparkles className="h-3.5 w-3.5 sm:mr-1.5" />
             <span className="hidden sm:inline">AI History</span>
           </TabsTrigger>
+          <TabsTrigger value="event-plans" className="text-xs sm:text-sm">
+            <Calendar className="h-3.5 w-3.5 sm:mr-1.5" />
+            <span className="hidden sm:inline">Event Plans</span>
+          </TabsTrigger>
         </TabsList>
 
         <AnimatePresence mode="wait">
@@ -778,6 +952,11 @@ export default function CustomerDashboard() {
           {customerTab === "ai-history" && (
             <TabsContent value="ai-history">
               <AIHistoryTab aiHistory={loading ? null : dashboardData?.aiHistory || null} />
+            </TabsContent>
+          )}
+          {customerTab === "event-plans" && (
+            <TabsContent value="event-plans">
+              <EventPlansTab />
             </TabsContent>
           )}
         </AnimatePresence>

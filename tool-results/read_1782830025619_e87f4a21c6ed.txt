@@ -1,0 +1,705 @@
+     1→"use client";
+     2→
+     3→import { useState, useEffect, useCallback } from "react";
+     4→import { motion, AnimatePresence } from "framer-motion";
+     5→import {
+     6→  Search,
+     7→  SlidersHorizontal,
+     8→  Sparkles,
+     9→  X,
+    10→  PackageOpen,
+    11→  Store,
+    12→} from "lucide-react";
+    13→import { Button } from "@/components/ui/button";
+    14→import { Input } from "@/components/ui/input";
+    15→import { Badge } from "@/components/ui/badge";
+    16→import { Slider } from "@/components/ui/slider";
+    17→import { Skeleton } from "@/components/ui/skeleton";
+    18→import {
+    19→  Select,
+    20→  SelectContent,
+    21→  SelectItem,
+    22→  SelectTrigger,
+    23→  SelectValue,
+    24→} from "@/components/ui/select";
+    25→import {
+    26→  Sheet,
+    27→  SheetContent,
+    28→  SheetHeader,
+    29→  SheetTitle,
+    30→  SheetTrigger,
+    31→} from "@/components/ui/sheet";
+    32→import {
+    33→  Pagination,
+    34→  PaginationContent,
+    35→  PaginationItem,
+    36→  PaginationLink,
+    37→  PaginationNext,
+    38→  PaginationPrevious,
+    39→  PaginationEllipsis,
+    40→} from "@/components/ui/pagination";
+    41→import { Separator } from "@/components/ui/separator";
+    42→import { Label } from "@/components/ui/label";
+    43→import { useAppStore } from "@/stores/app-store";
+    44→import ProductCard, { ProductCardSkeleton } from "./ProductCard";
+    45→import EventPlannerDialog from "./EventPlannerDialog";
+    46→import HeroSection from "./HeroSection";
+    47→import CategoriesShowcase from "./CategoriesShowcase";
+    48→import HowItWorks from "./HowItWorks";
+    49→import WhyRentWise from "./WhyRentWise";
+    50→import type { AppProduct, AppCategory, ProductCondition, BookingType } from "@/lib/types";
+    51→
+    52→const ITEMS_PER_PAGE = 12;
+    53→
+    54→const CONDITION_OPTIONS: { value: ProductCondition | "ALL"; label: string }[] = [
+    55→  { value: "ALL", label: "All Conditions" },
+    56→  { value: "NEW", label: "New" },
+    57→  { value: "LIKE_NEW", label: "Like New" },
+    58→  { value: "GOOD", label: "Good" },
+    59→  { value: "FAIR", label: "Fair" },
+    60→];
+    61→
+    62→const SORT_OPTIONS = [
+    63→  { value: "newest", label: "Newest First" },
+    64→  { value: "price_low", label: "Price: Low to High" },
+    65→  { value: "price_high", label: "Price: High to Low" },
+    66→  { value: "rating", label: "Highest Rated" },
+    67→  { value: "popular", label: "Most Popular" },
+    68→];
+    69→
+    70→export default function MarketplaceView() {
+    71→  const { navigateTo, openAuthDialog, user, token } = useAppStore();
+    72→  const isVendor = user?.role === "VENDOR";
+    73→
+    74→  // Data
+    75→  const [categories, setCategories] = useState<AppCategory[]>([]);
+    76→  const [products, setProducts] = useState<AppProduct[]>([]);
+    77→  const [totalCount, setTotalCount] = useState(0);
+    78→  const [loading, setLoading] = useState(true);
+    79→  const [categoriesLoading, setCategoriesLoading] = useState(true);
+    80→
+    81→  // Filters
+    82→  const [searchQuery, setSearchQuery] = useState("");
+    83→  const [activeSearch, setActiveSearch] = useState("");
+    84→  const [selectedCategory, setSelectedCategory] = useState<string>("ALL");
+    85→  const [bookingType, setBookingType] = useState<"ALL" | BookingType>("ALL");
+    86→  const [priceRange, setPriceRange] = useState<[number, number]>([0, 50000]);
+    87→  const [condition, setCondition] = useState<ProductCondition | "ALL">("ALL");
+    88→  const [sortBy, setSortBy] = useState("newest");
+    89→  const [page, setPage] = useState(1);
+    90→
+    91→  // Mobile filter sheet
+    92→  const [filterSheetOpen, setFilterSheetOpen] = useState(false);
+    93→
+    94→  // Event planner dialog
+    95→  const [eventPlannerOpen, setEventPlannerOpen] = useState(false);
+    96→
+    97→  // Listen for open-event-planner events from Footer
+    98→  useEffect(() => {
+    99→    const handler = () => setEventPlannerOpen(true);
+   100→    window.addEventListener("open-event-planner", handler);
+   101→    return () => window.removeEventListener("open-event-planner", handler);
+   102→  }, []);
+   103→
+   104→  // Listen for search events from Navbar / Hero
+   105→  useEffect(() => {
+   106→    const handler = (e: Event) => {
+   107→      const customEvent = e as CustomEvent<string>;
+   108→      const query = customEvent.detail;
+   109→      setActiveSearch(query);
+   110→      setSearchQuery(query);
+   111→      setPage(1);
+   112→      // Scroll to marketplace content
+   113→      const el = document.getElementById("marketplace-content");
+   114→      if (el) {
+   115→        setTimeout(() => {
+   116→          el.scrollIntoView({ behavior: "smooth", block: "start" });
+   117→        }, 100);
+   118→      }
+   119→    };
+   120→    window.addEventListener("marketplace-search", handler);
+   121→    return () => window.removeEventListener("marketplace-search", handler);
+   122→  }, []);
+   123→
+   124→  // Listen for category filter events from CategoriesShowcase
+   125→  useEffect(() => {
+   126→    const handler = (e: Event) => {
+   127→      const customEvent = e as CustomEvent<string>;
+   128→      const categoryId = customEvent.detail;
+   129→      setSelectedCategory(categoryId);
+   130→      setPage(1);
+   131→      // Scroll to marketplace content
+   132→      const el = document.getElementById("marketplace-content");
+   133→      if (el) {
+   134→        setTimeout(() => {
+   135→          el.scrollIntoView({ behavior: "smooth", block: "start" });
+   136→        }, 100);
+   137→      }
+   138→    };
+   139→    window.addEventListener("marketplace-category-filter", handler);
+   140→    return () => window.removeEventListener("marketplace-category-filter", handler);
+   141→  }, []);
+   142→
+   143→  // Fetch categories
+   144→  useEffect(() => {
+   145→    const fetchCategories = async () => {
+   146→      setCategoriesLoading(true);
+   147→      try {
+   148→        const res = await fetch("/api/categories");
+   149→        if (res.ok) {
+   150→          const data = await res.json();
+   151→          setCategories(data);
+   152→        }
+   153→      } catch {
+   154→        // Categories optional
+   155→      } finally {
+   156→        setCategoriesLoading(false);
+   157→      }
+   158→    };
+   159→    fetchCategories();
+   160→  }, []);
+   161→
+   162→  // Fetch products
+   163→  const fetchProducts = useCallback(async () => {
+   164→    setLoading(true);
+   165→    try {
+   166→      if (isVendor && token) {
+   167→        // Vendor sees only their own products
+   168→        const res = await fetch("/api/vendors/products", {
+   169→          headers: { Authorization: `Bearer ${token}` },
+   170→        });
+   171→        if (res.ok) {
+   172→          const data = await res.json();
+   173→          let vendorProducts: AppProduct[] = data.products || data || [];
+   174→          // Apply search filter client-side
+   175→          if (activeSearch) {
+   176→            const q = activeSearch.toLowerCase();
+   177→            vendorProducts = vendorProducts.filter((p) =>
+   178→              p.title.toLowerCase().includes(q)
+   179→            );
+   180→          }
+   181→          // Apply category filter client-side
+   182→          if (selectedCategory !== "ALL") {
+   183→            vendorProducts = vendorProducts.filter(
+   184→              (p) => p.categoryId === selectedCategory
+   185→            );
+   186→          }
+   187→          setProducts(vendorProducts);
+   188→          setTotalCount(vendorProducts.length);
+   189→        }
+   190→      } else {
+   191→        const params = new URLSearchParams();
+   192→        params.set("page", page.toString());
+   193→        params.set("limit", ITEMS_PER_PAGE.toString());
+   194→        if (activeSearch) params.set("search", activeSearch);
+   195→        if (selectedCategory !== "ALL") params.set("categoryId", selectedCategory);
+   196→        if (bookingType !== "ALL") params.set("bookingType", bookingType);
+   197→        if (condition !== "ALL") params.set("condition", condition);
+   198→        if (priceRange[0] > 0) params.set("minPrice", priceRange[0].toString());
+   199→        if (priceRange[1] < 50000) params.set("maxPrice", priceRange[1].toString());
+   200→        if (sortBy) params.set("sort", sortBy);
+   201→
+   202→        const res = await fetch(`/api/products?${params.toString()}`);
+   203→        if (res.ok) {
+   204→          const data = await res.json();
+   205→          setProducts(data.products || data);
+   206→          setTotalCount(data.total || (Array.isArray(data) ? data.length : 0));
+   207→        }
+   208→      }
+   209→    } catch {
+   210→      // silently fail
+   211→    } finally {
+   212→      setLoading(false);
+   213→    }
+   214→  }, [page, activeSearch, selectedCategory, bookingType, condition, priceRange, sortBy, isVendor, token]);
+   215→
+   216→  useEffect(() => {
+   217→    fetchProducts();
+   218→  }, [fetchProducts]);
+   219→
+   220→  const totalPages = Math.ceil(totalCount / ITEMS_PER_PAGE);
+   221→
+   222→  const handleSearchSubmit = (e: React.FormEvent) => {
+   223→    e.preventDefault();
+   224→    setActiveSearch(searchQuery);
+   225→    setPage(1);
+   226→  };
+   227→
+   228→  const clearFilters = () => {
+   229→    setSearchQuery("");
+   230→    setActiveSearch("");
+   231→    setSelectedCategory("ALL");
+   232→    setBookingType("ALL");
+   233→    setPriceRange([0, 50000]);
+   234→    setCondition("ALL");
+   235→    setSortBy("newest");
+   236→    setPage(1);
+   237→  };
+   238→
+   239→  const hasActiveFilters =
+   240→    activeSearch ||
+   241→    selectedCategory !== "ALL" ||
+   242→    bookingType !== "ALL" ||
+   243→    condition !== "ALL" ||
+   244→    priceRange[0] > 0 ||
+   245→    priceRange[1] < 50000;
+   246→
+   247→  // Sidebar Filters Content (shared between desktop and mobile)
+   248→  const FiltersContent = () => (
+   249→    <div className="space-y-6">
+   250→      {/* Booking Type */}
+   251→      <div className="space-y-2">
+   252→        <Label className="text-sm font-medium">Booking Type</Label>
+   253→        <div className="flex gap-2">
+   254→          {(["ALL", "RENT", "BUY", "BOOK"] as const).map((type) => (
+   255→            <Button
+   256→              key={type}
+   257→              variant={bookingType === type ? "default" : "outline"}
+   258→              size="sm"
+   259→              className="rounded-full text-xs flex-1"
+   260→              onClick={() => {
+   261→                setBookingType(type);
+   262→                setPage(1);
+   263→              }}
+   264→            >
+   265→              {type === "ALL" ? "All" : type.charAt(0) + type.slice(1).toLowerCase()}
+   266→            </Button>
+   267→          ))}
+   268→        </div>
+   269→      </div>
+   270→
+   271→      <Separator />
+   272→
+   273→      {/* Price Range */}
+   274→      <div className="space-y-3">
+   275→        <Label className="text-sm font-medium">Price Range (per day)</Label>
+   276→        <Slider
+   277→          min={0}
+   278→          max={50000}
+   279→          step={500}
+   280→          value={priceRange}
+   281→          onValueChange={(val) => {
+   282→            setPriceRange(val as [number, number]);
+   283→            setPage(1);
+   284→          }}
+   285→        />
+   286→        <div className="flex justify-between text-xs text-muted-foreground">
+   287→          <span>\u20B9{priceRange[0].toLocaleString("en-IN")}</span>
+   288→          <span>\u20B9{priceRange[1].toLocaleString("en-IN")}</span>
+   289→        </div>
+   290→      </div>
+   291→
+   292→      <Separator />
+   293→
+   294→      {/* Condition */}
+   295→      <div className="space-y-2">
+   296→        <Label className="text-sm font-medium">Condition</Label>
+   297→        <Select
+   298→          value={condition}
+   299→          onValueChange={(val) => {
+   300→            setCondition(val as ProductCondition | "ALL");
+   301→            setPage(1);
+   302→          }}
+   303→        >
+   304→          <SelectTrigger className="w-full">
+   305→            <SelectValue />
+   306→          </SelectTrigger>
+   307→          <SelectContent>
+   308→            {CONDITION_OPTIONS.map((opt) => (
+   309→              <SelectItem key={opt.value} value={opt.value}>
+   310→                {opt.label}
+   311→              </SelectItem>
+   312→            ))}
+   313→          </SelectContent>
+   314→        </Select>
+   315→      </div>
+   316→
+   317→      <Separator />
+   318→
+   319→      {/* Sort By */}
+   320→      <div className="space-y-2">
+   321→        <Label className="text-sm font-medium">Sort By</Label>
+   322→        <Select
+   323→          value={sortBy}
+   324→          onValueChange={(val) => {
+   325→            setSortBy(val);
+   326→            setPage(1);
+   327→          }}
+   328→        >
+   329→          <SelectTrigger className="w-full">
+   330→            <SelectValue />
+   331→          </SelectTrigger>
+   332→          <SelectContent>
+   333→            {SORT_OPTIONS.map((opt) => (
+   334→              <SelectItem key={opt.value} value={opt.value}>
+   335→                {opt.label}
+   336→              </SelectItem>
+   337→            ))}
+   338→          </SelectContent>
+   339→        </Select>
+   340→      </div>
+   341→
+   342→      {hasActiveFilters && (
+   343→        <>
+   344→          <Separator />
+   345→          <Button
+   346→            variant="ghost"
+   347→            size="sm"
+   348→            className="w-full text-muted-foreground"
+   349→            onClick={clearFilters}
+   350→          >
+   351→            <X className="mr-2 h-3.5 w-3.5" />
+   352→            Clear all filters
+   353→          </Button>
+   354→        </>
+   355→      )}
+   356→    </div>
+   357→  );
+   358→
+   359→  return (
+   360→    <div className="flex-1">
+   361→      {/* Vendor banner instead of hero/categories for vendor users */}
+   362→      {!isVendor && <HeroSection />}
+   363→
+   364→      {!isVendor && <CategoriesShowcase />}
+   365→
+   366→      {isVendor && (
+   367→        <div className="bg-primary/5 border-b">
+   368→          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-6">
+   369→            <div className="flex items-center gap-3">
+   370→              <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
+   371→                <Store className="h-5 w-5 text-primary" />
+   372→              </div>
+   373→              <div>
+   374→                <h2 className="text-lg font-semibold text-foreground">Showing your equipment</h2>
+   375→                <p className="text-sm text-muted-foreground">Manage and view all products you&apos;ve listed</p>
+   376→              </div>
+   377→            </div>
+   378→          </div>
+   379→        </div>
+   380→      )}
+   381→
+   382→      {/* 3. Marketplace Content */}
+   383→      <div id="marketplace-content" className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8 sm:py-10">
+   384→        {/* Section Header + AI Event Planner */}
+   385→        <div className="mb-6">
+   386→          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+   387→            <div>
+   388→              <h2 className="text-2xl sm:text-3xl font-bold text-foreground">
+   389→                {isVendor ? "My Equipment" : "All Equipment"}
+   390→              </h2>
+   391→              <p className="text-sm text-muted-foreground mt-1">
+   392→                {isVendor
+   393→                  ? "Manage and monitor your listed equipment"
+   394→                  : "Rent, buy, or book from verified vendors across India"}
+   395→              </p>
+   396→            </div>
+   397→            {!isVendor && (
+   398→              <Button
+   399→                onClick={() => setEventPlannerOpen(true)}
+   400→                className="gap-2 rounded-full self-start sm:self-auto"
+   401→              >
+   402→                <Sparkles className="h-4 w-4" />
+   403→                AI Event Planner
+   404→              </Button>
+   405→            )}
+   406→          </div>
+   407→        </div>
+   408→
+   409→        {/* Search Bar */}
+   410→        <form onSubmit={handleSearchSubmit} className="mb-5">
+   411→          <div className="relative max-w-2xl mx-auto">
+   412→            <Search className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
+   413→            <Input
+   414→              placeholder="Search for equipment, tools, electronics..."
+   415→              value={searchQuery}
+   416→              onChange={(e) => setSearchQuery(e.target.value)}
+   417→              className="pl-12 pr-20 h-12 rounded-full bg-card border shadow-sm text-base"
+   418→            />
+   419→            <Button
+   420→              type="submit"
+   421→              size="sm"
+   422→              className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded-full"
+   423→            >
+   424→              Search
+   425→            </Button>
+   426→          </div>
+   427→        </form>
+   428→
+   429→        {/* Category Pills */}
+   430→        {!categoriesLoading && categories.length > 0 && (
+   431→          <div className="mb-6">
+   432→            <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-none">
+   433→              <button
+   434→                onClick={() => {
+   435→                  setSelectedCategory("ALL");
+   436→                  setPage(1);
+   437→                }}
+   438→                className="shrink-0"
+   439→              >
+   440→                <Badge
+   441→                  variant={selectedCategory === "ALL" ? "default" : "outline"}
+   442→                  className="rounded-full px-4 py-1.5 text-sm cursor-pointer transition-premium"
+   443→                >
+   444→                  All
+   445→                </Badge>
+   446→              </button>
+   447→              {categories.map((cat) => (
+   448→                <button
+   449→                  key={cat.id}
+   450→                  onClick={() => {
+   451→                    setSelectedCategory(cat.id);
+   452→                    setPage(1);
+   453→                  }}
+   454→                  className="shrink-0"
+   455→                >
+   456→                  <Badge
+   457→                    variant={selectedCategory === cat.id ? "default" : "outline"}
+   458→                    className="rounded-full px-4 py-1.5 text-sm cursor-pointer transition-premium"
+   459→                  >
+   460→                    {cat.icon && <span className="mr-1">{cat.icon}</span>}
+   461→                    {cat.name}
+   462→                    {cat._count?.products != null && (
+   463→                      <span className="ml-1.5 text-[10px] opacity-70">
+   464→                        {cat._count.products}
+   465→                      </span>
+   466→                    )}
+   467→                  </Badge>
+   468→                </button>
+   469→              ))}
+   470→            </div>
+   471→          </div>
+   472→        )}
+   473→
+   474→        {/* Mobile Filter Button */}
+   475→        <div className="flex items-center justify-between mb-4 lg:hidden">
+   476→          <p className="text-sm text-muted-foreground">
+   477→            {totalCount > 0
+   478→              ? `${totalCount} equipment found`
+   479→              : "No equipment found"}
+   480→          </p>
+   481→          <Sheet open={filterSheetOpen} onOpenChange={setFilterSheetOpen}>
+   482→            <SheetTrigger asChild>
+   483→              <Button variant="outline" size="sm" className="gap-2 rounded-full">
+   484→                <SlidersHorizontal className="h-4 w-4" />
+   485→                Filters
+   486→                {hasActiveFilters && (
+   487→                  <span className="h-2 w-2 rounded-full bg-primary" />
+   488→                )}
+   489→              </Button>
+   490→            </SheetTrigger>
+   491→            <SheetContent side="bottom" className="h-[80vh] rounded-t-2xl">
+   492→              <SheetHeader>
+   493→                <SheetTitle>Filters</SheetTitle>
+   494→              </SheetHeader>
+   495→              <div className="mt-4 overflow-y-auto max-h-[60vh]">
+   496→                <FiltersContent />
+   497→              </div>
+   498→            </SheetContent>
+   499→          </Sheet>
+   500→        </div>
+   501→
+   502→        {/* Main Layout */}
+   503→        <div className="flex gap-6">
+   504→          {/* Desktop Sidebar */}
+   505→          <aside className="hidden lg:block w-64 shrink-0">
+   506→            <div className="sticky top-20">
+   507→              <div className="flex items-center justify-between mb-4">
+   508→                <h3 className="text-sm font-semibold text-foreground">Filters</h3>
+   509→                {hasActiveFilters && (
+   510→                  <button
+   511→                    onClick={clearFilters}
+   512→                    className="text-xs text-muted-foreground hover:text-foreground transition-premium"
+   513→                  >
+   514→                    Clear all
+   515→                  </button>
+   516→                )}
+   517→              </div>
+   518→              <div className="rounded-xl border bg-card p-4">
+   519→                <FiltersContent />
+   520→              </div>
+   521→            </div>
+   522→          </aside>
+   523→
+   524→          {/* Product Grid */}
+   525→          <main className="flex-1 min-w-0">
+   526→            {/* Active filter tags */}
+   527→            {hasActiveFilters && (
+   528→              <div className="flex flex-wrap gap-2 mb-4">
+   529→                {activeSearch && (
+   530→                  <Badge variant="secondary" className="rounded-full gap-1">
+   531→                    &ldquo;{activeSearch}&rdquo;
+   532→                    <button onClick={() => { setSearchQuery(""); setActiveSearch(""); setPage(1); }}>
+   533→                      <X className="h-3 w-3 ml-1" />
+   534→                    </button>
+   535→                  </Badge>
+   536→                )}
+   537→                {selectedCategory !== "ALL" && (
+   538→                  <Badge variant="secondary" className="rounded-full gap-1">
+   539→                    {categories.find((c) => c.id === selectedCategory)?.name || "Category"}
+   540→                    <button onClick={() => { setSelectedCategory("ALL"); setPage(1); }}>
+   541→                      <X className="h-3 w-3 ml-1" />
+   542→                    </button>
+   543→                  </Badge>
+   544→                )}
+   545→                {bookingType !== "ALL" && (
+   546→                  <Badge variant="secondary" className="rounded-full gap-1">
+   547→                    {bookingType}
+   548→                    <button onClick={() => { setBookingType("ALL"); setPage(1); }}>
+   549→                      <X className="h-3 w-3 ml-1" />
+   550→                    </button>
+   551→                  </Badge>
+   552→                )}
+   553→                {condition !== "ALL" && (
+   554→                  <Badge variant="secondary" className="rounded-full gap-1">
+   555→                    {condition.replace("_", " ")}
+   556→                    <button onClick={() => { setCondition("ALL"); setPage(1); }}>
+   557→                      <X className="h-3 w-3 ml-1" />
+   558→                    </button>
+   559→                  </Badge>
+   560→                )}
+   561→              </div>
+   562→            )}
+   563→
+   564→            {/* Desktop result count */}
+   565→            <div className="hidden lg:flex items-center justify-between mb-4">
+   566→              <p className="text-sm text-muted-foreground">
+   567→                {loading ? "Loading..." : `${totalCount} equipment found`}
+   568→              </p>
+   569→            </div>
+   570→
+   571→            {/* Loading State */}
+   572→            {loading && (
+   573→              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4">
+   574→                {Array.from({ length: 8 }).map((_, i) => (
+   575→                  <ProductCardSkeleton key={i} />
+   576→                ))}
+   577→              </div>
+   578→            )}
+   579→
+   580→            {/* Empty State */}
+   581→            {!loading && products.length === 0 && (
+   582→              <motion.div
+   583→                initial={{ opacity: 0, y: 20 }}
+   584→                animate={{ opacity: 1, y: 0 }}
+   585→                className="flex flex-col items-center justify-center py-20 text-center"
+   586→              >
+   587→                <div className="h-20 w-20 rounded-full bg-muted flex items-center justify-center mb-4">
+   588→                  <PackageOpen className="h-10 w-10 text-muted-foreground" />
+   589→                </div>
+   590→                <h3 className="text-lg font-semibold text-foreground mb-1">
+   591→                  No equipment found
+   592→                </h3>
+   593→                <p className="text-sm text-muted-foreground mb-4 max-w-sm">
+   594→                  Try adjusting your search or filters to find what you&apos;re
+   595→                  looking for.
+   596→                </p>
+   597→                <Button variant="outline" className="rounded-full" onClick={clearFilters}>
+   598→                  Clear all filters
+   599→                </Button>
+   600→              </motion.div>
+   601→            )}
+   602→
+   603→            {/* Product Grid */}
+   604→            {!loading && products.length > 0 && (
+   605→              <motion.div
+   606→                initial={{ opacity: 0 }}
+   607→                animate={{ opacity: 1 }}
+   608→                className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4"
+   609→              >
+   610→                <AnimatePresence mode="popLayout">
+   611→                  {products.map((product) => (
+   612→                    <motion.div
+   613→                      key={product.id}
+   614→                      layout
+   615→                      initial={{ opacity: 0, y: 20 }}
+   616→                      animate={{ opacity: 1, y: 0 }}
+   617→                      exit={{ opacity: 0, scale: 0.95 }}
+   618→                      transition={{ duration: 0.2 }}
+   619→                    >
+   620→                      <ProductCard product={product} />
+   621→                    </motion.div>
+   622→                  ))}
+   623→                </AnimatePresence>
+   624→              </motion.div>
+   625→            )}
+   626→
+   627→            {/* Pagination */}
+   628→            {!loading && totalPages > 1 && (
+   629→              <div className="mt-8">
+   630→                <Pagination>
+   631→                  <PaginationContent>
+   632→                    <PaginationItem>
+   633→                      <PaginationPrevious
+   634→                        href="#"
+   635→                        onClick={(e) => {
+   636→                          e.preventDefault();
+   637→                          if (page > 1) setPage(page - 1);
+   638→                        }}
+   639→                        className={page <= 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
+   640→                      />
+   641→                    </PaginationItem>
+   642→
+   643→                    {Array.from({ length: totalPages }, (_, i) => i + 1)
+   644→                      .filter((p) => {
+   645→                        if (totalPages <= 7) return true;
+   646→                        if (p === 1 || p === totalPages) return true;
+   647→                        if (Math.abs(p - page) <= 1) return true;
+   648→                        return false;
+   649→                      })
+   650→                      .map((p, idx, arr) => {
+   651→                        const prev = arr[idx - 1];
+   652→                        const showEllipsis = prev != null && p - prev > 1;
+   653→                        return (
+   654→                          <span key={p} className="contents">
+   655→                            {showEllipsis && (
+   656→                              <PaginationItem>
+   657→                                <PaginationEllipsis />
+   658→                              </PaginationItem>
+   659→                            )}
+   660→                            <PaginationItem>
+   661→                              <PaginationLink
+   662→                                href="#"
+   663→                                isActive={p === page}
+   664→                                onClick={(e) => {
+   665→                                  e.preventDefault();
+   666→                                  setPage(p);
+   667→                                }}
+   668→                                className="cursor-pointer"
+   669→                              >
+   670→                                {p}
+   671→                              </PaginationLink>
+   672→                            </PaginationItem>
+   673→                          </span>
+   674→                        );
+   675→                      })}
+   676→
+   677→                    <PaginationItem>
+   678→                      <PaginationNext
+   679→                        href="#"
+   680→                        onClick={(e) => {
+   681→                          e.preventDefault();
+   682→                          if (page < totalPages) setPage(page + 1);
+   683→                        }}
+   684→                        className={page >= totalPages ? "pointer-events-none opacity-50" : "cursor-pointer"}
+   685→                      />
+   686→                    </PaginationItem>
+   687→                  </PaginationContent>
+   688→                </Pagination>
+   689→              </div>
+   690→            )}
+   691→          </main>
+   692→        </div>
+   693→      </div>
+   694→
+   695→      {/* 4. How It Works */}
+   696→      {!isVendor && <HowItWorks />}
+   697→
+   698→      {/* 5. Why RentWise */}
+   699→      {!isVendor && <WhyRentWise />}
+   700→
+   701→      {/* Event Planner Dialog */}
+   702→      <EventPlannerDialog open={eventPlannerOpen} onOpenChange={setEventPlannerOpen} />
+   703→    </div>
+   704→  );
+   705→}
