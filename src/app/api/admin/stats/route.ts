@@ -41,8 +41,8 @@ export async function GET() {
       activeRentals,
       pendingApprovals,
       totalRevenue: totalRevenue._sum.totalPrice || 0,
-      bookingByStatus: Object.fromEntries(bookingByStatus.map((b) => [b.status, b._count.id])),
-      bookingByType: Object.fromEntries(bookingByType.map((b) => [b.bookingType, b._count.id])),
+      bookingsByStatus: bookingByStatus.map((b) => ({ status: b.status, count: b._count.id })),
+      bookingsByType: bookingByType.map((b) => ({ type: b.bookingType, count: b._count.id })),
       recentBookings,
     });
   } catch (error: unknown) {

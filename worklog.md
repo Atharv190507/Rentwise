@@ -43,3 +43,25 @@ Stage Summary:
 - Dashboard navigation improvements with back-to-marketplace buttons
 - Custom event-based communication between Hero/Categories and marketplace filters
 - All lint checks passing
+
+---
+Task ID: 3
+Agent: Main
+Task: Fix admin login failure and admin dashboard crash
+
+Work Log:
+- Investigated "invalid email or password" error when clicking "Try as Admin"
+- Found database had 0 ADMIN users — seed script had never run successfully
+- Discovered syntax error in prisma/seed.ts line 73: unescaped double quotes in `"1.35" Titanium Tweeter"` string
+- Fixed by changing to single quotes: `'1.35" Titanium Tweeter'`
+- Reset database and re-ran seed: 10 categories, 20 vendors, 98 products, 49 customers, 3 admins, 500 bookings
+- Verified admin login works via browser automation
+- Discovered second bug: Admin Dashboard crashed on load due to API/frontend data shape mismatch
+- API returned `bookingByStatus` as an object `{ PENDING: 96, ... }`, but frontend expected `bookingsByStatus` as array `[{ status: "PENDING", count: 96 }, ...]`
+- Fixed /api/admin/stats/route.ts to return arrays with correct field names
+- Verified admin dashboard renders correctly with all tabs (Overview, Users, Vendors, Products, Bookings) and charts
+
+Stage Summary:
+- Admin login now works: admin@rentwise.ai / admin123
+- Seed data fully populated: 72 users, 98 products, 500 bookings
+- Admin dashboard renders with stat cards, bar charts, and recent bookings table

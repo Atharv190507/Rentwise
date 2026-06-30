@@ -1,0 +1,1015 @@
+     1→"use client";
+     2→
+     3→import { useState, useEffect, useCallback } from "react";
+     4→import { motion, AnimatePresence } from "framer-motion";
+     5→import { toast } from "sonner";
+     6→import {
+     7→  Package,
+     8→  Calendar,
+     9→  DollarSign,
+    10→  Users,
+    11→  Store,
+    12→  BarChart3,
+    13→  Star,
+    14→  TrendingUp,
+    15→  Clock,
+    16→  CheckCircle,
+    17→  XCircle,
+    18→  AlertCircle,
+    19→  Search,
+    20→  Filter,
+    21→  Eye,
+    22→  Shield,
+    23→  Ban,
+    24→  Check,
+    25→  Loader2,
+    26→  Mail,
+    27→  Phone,
+    28→  ArrowLeft,
+    29→} from "lucide-react";
+    30→import { Button } from "@/components/ui/button";
+    31→import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+    32→import { Badge } from "@/components/ui/badge";
+    33→import { Input } from "@/components/ui/input";
+    34→import { Skeleton } from "@/components/ui/skeleton";
+    35→import { Separator } from "@/components/ui/separator";
+    36→import { Switch } from "@/components/ui/switch";
+    37→import {
+    38→  Select,
+    39→  SelectContent,
+    40→  SelectItem,
+    41→  SelectTrigger,
+    42→  SelectValue,
+    43→} from "@/components/ui/select";
+    44→import {
+    45→  Table,
+    46→  TableBody,
+    47→  TableCell,
+    48→  TableHead,
+    49→  TableHeader,
+    50→  TableRow,
+    51→} from "@/components/ui/table";
+    52→import {
+    53→  Tabs,
+    54→  TabsContent,
+    55→  TabsList,
+    56→  TabsTrigger,
+    57→} from "@/components/ui/tabs";
+    58→import {
+    59→  BarChart,
+    60→  Bar,
+    61→  XAxis,
+    62→  YAxis,
+    63→  CartesianGrid,
+    64→  Tooltip,
+    65→  ResponsiveContainer,
+    66→} from "recharts";
+    67→import { useAppStore } from "@/stores/app-store";
+    68→import type {
+    69→  AppBooking,
+    70→  AppProduct,
+    71→  BookingStatus,
+    72→  ProductStatus,
+    73→  UserRole,
+    74→} from "@/lib/types";
+    75→import { BOOKING_STATUS_COLORS, BOOKING_TYPE_COLORS } from "@/lib/types";
+    76→
+    77→const tabAnimation = {
+    78→  initial: { opacity: 0, y: 12 },
+    79→  animate: { opacity: 1, y: 0 },
+    80→  exit: { opacity: 0, y: -12 },
+    81→  transition: { duration: 0.25, ease: "easeOut" },
+    82→};
+    83→
+    84→function formatINR(amount: number) {
+    85→  return `₹${amount.toLocaleString("en-IN")}`;
+    86→}
+    87→
+    88→function formatDate(dateStr: string) {
+    89→  return new Date(dateStr).toLocaleDateString("en-IN", {
+    90→    day: "numeric",
+    91→    month: "short",
+    92→    year: "numeric",
+    93→  });
+    94→}
+    95→
+    96→// --- Skeletons ---
+    97→
+    98→function AdminOverviewSkeleton() {
+    99→  return (
+   100→    <div className="space-y-6">
+   101→      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+   102→        {[...Array(6)].map((_, i) => (
+   103→          <Card key={i} className="p-4">
+   104→            <div className="flex items-center gap-4">
+   105→              <Skeleton className="h-10 w-10 rounded-lg" />
+   106→              <div className="space-y-2 flex-1">
+   107→                <Skeleton className="h-5 w-16" />
+   108→                <Skeleton className="h-3 w-28" />
+   109→              </div>
+   110→            </div>
+   111→          </Card>
+   112→        ))}
+   113→      </div>
+   114→      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+   115→        <Card><CardHeader><Skeleton className="h-5 w-40" /></CardHeader><CardContent><Skeleton className="h-[250px] w-full" /></CardContent></Card>
+   116→        <Card><CardHeader><Skeleton className="h-5 w-40" /></CardHeader><CardContent><Skeleton className="h-[250px] w-full" /></CardContent></Card>
+   117→      </div>
+   118→      <Card><CardHeader><Skeleton className="h-5 w-40" /></CardHeader><CardContent><div className="space-y-3">{[...Array(5)].map((_, i) => <Skeleton key={i} className="h-10 w-full" />)}</div></CardContent></Card>
+   119→    </div>
+   120→  );
+   121→}
+   122→
+   123→function TableSkeleton({ rows = 8 }: { rows?: number }) {
+   124→  return (
+   125→    <Card>
+   126→      <CardContent className="p-0">
+   127→        <div className="space-y-3 p-4">
+   128→          <Skeleton className="h-9 w-full" />
+   129→          {[...Array(rows)].map((_, i) => (
+   130→            <Skeleton key={i} className="h-12 w-full" />
+   131→          ))}
+   132→        </div>
+   133→      </CardContent>
+   134→    </Card>
+   135→  );
+   136→}
+   137→
+   138→// --- Overview Tab ---
+   139→
+   140→interface AdminStats {
+   141→  totalUsers: number;
+   142→  totalVendors: number;
+   143→  totalProducts: number;
+   144→  activeRentals: number;
+   145→  pendingApprovals: number;
+   146→  totalRevenue: number;
+   147→  bookingsByStatus: Array<{ status: string; count: number }>;
+   148→  bookingsByType: Array<{ type: string; count: number }>;
+   149→  recentBookings: AppBooking[];
+   150→}
+   151→
+   152→function AdminOverviewTab({ stats }: { stats: AdminStats | null }) {
+   153→  if (!stats) return <AdminOverviewSkeleton />;
+   154→
+   155→  const statCards = [
+   156→    { icon: <Users className="h-5 w-5" />, value: stats.totalUsers, label: "Total Users", color: "text-primary", bg: "bg-primary/10" },
+   157→    { icon: <Store className="h-5 w-5" />, value: stats.totalVendors, label: "Total Vendors", color: "text-emerald-600 dark:text-emerald-400", bg: "bg-emerald-100 dark:bg-emerald-900/30" },
+   158→    { icon: <Package className="h-5 w-5" />, value: stats.totalProducts, label: "Total Products", color: "text-violet-600 dark:text-violet-400", bg: "bg-violet-100 dark:bg-violet-900/30" },
+   159→    { icon: <Calendar className="h-5 w-5" />, value: stats.activeRentals, label: "Active Rentals", color: "text-amber-600 dark:text-amber-400", bg: "bg-amber-100 dark:bg-amber-900/30" },
+   160→    { icon: <Clock className="h-5 w-5" />, value: stats.pendingApprovals, label: "Pending Approvals", color: "text-red-600 dark:text-red-400", bg: "bg-red-100 dark:bg-red-900/30" },
+   161→    { icon: <DollarSign className="h-5 w-5" />, value: formatINR(stats.totalRevenue), label: "Total Revenue", color: "text-emerald-600 dark:text-emerald-400", bg: "bg-emerald-100 dark:bg-emerald-900/30" },
+   162→  ];
+   163→
+   164→  const statusColors: Record<string, string> = {
+   165→    PENDING: "#d97706",
+   166→    APPROVED: "#2563eb",
+   167→    CONFIRMED: "#059669",
+   168→    DELIVERED: "#7c3aed",
+   169→    RETURNED: "#64748b",
+   170→    COMPLETED: "#059669",
+   171→    CANCELLED: "#dc2626",
+   172→    REJECTED: "#dc2626",
+   173→  };
+   174→
+   175→  const typeColors: Record<string, string> = {
+   176→    RENT: "#059669",
+   177→    BUY: "#7c3aed",
+   178→    BOOK: "#d97706",
+   179→  };
+   180→
+   181→  return (
+   182→    <motion.div {...tabAnimation} className="space-y-6">
+   183→      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+   184→        {statCards.map((card, i) => (
+   185→          <Card key={i} className="p-4 card-hover">
+   186→            <div className="flex items-center gap-4">
+   187→              <div className={`flex h-10 w-10 items-center justify-center rounded-lg ${card.bg} ${card.color}`}>
+   188→                {card.icon}
+   189→              </div>
+   190→              <div>
+   191→                <p className="text-2xl font-bold leading-tight">{card.value}</p>
+   192→                <p className="text-xs text-muted-foreground">{card.label}</p>
+   193→              </div>
+   194→            </div>
+   195→          </Card>
+   196→        ))}
+   197→      </div>
+   198→
+   199→      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+   200→        {/* Bookings by Status */}
+   201→        {stats.bookingsByStatus.length > 0 && (
+   202→          <Card>
+   203→            <CardHeader className="pb-3">
+   204→              <CardTitle className="text-base font-semibold">Bookings by Status</CardTitle>
+   205→            </CardHeader>
+   206→            <CardContent>
+   207→              <div className="h-[250px] w-full">
+   208→                <ResponsiveContainer width="100%" height="100%">
+   209→                  <BarChart data={stats.bookingsByStatus}>
+   210→                    <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+   211→                    <XAxis dataKey="status" tick={{ fontSize: 11 }} className="fill-muted-foreground" />
+   212→                    <YAxis tick={{ fontSize: 11 }} className="fill-muted-foreground" allowDecimals={false} />
+   213→                    <Tooltip
+   214→                      contentStyle={{
+   215→                        backgroundColor: "var(--popover)",
+   216→                        border: "1px solid var(--border)",
+   217→                        borderRadius: "var(--radius)",
+   218→                        color: "var(--popover-foreground)",
+   219→                      }}
+   220→                    />
+   221→                    <Bar dataKey="count" radius={[4, 4, 0, 0]}>
+   222→                      {stats.bookingsByStatus.map((entry, index) => (
+   223→                        <rect key={index} fill={statusColors[entry.status] || "var(--primary)"} />
+   224→                      ))}
+   225→                    </Bar>
+   226→                  </BarChart>
+   227→                </ResponsiveContainer>
+   228→              </div>
+   229→            </CardContent>
+   230→          </Card>
+   231→        )}
+   232→
+   233→        {/* Bookings by Type */}
+   234→        {stats.bookingsByType.length > 0 && (
+   235→          <Card>
+   236→            <CardHeader className="pb-3">
+   237→              <CardTitle className="text-base font-semibold">Bookings by Type</CardTitle>
+   238→            </CardHeader>
+   239→            <CardContent>
+   240→              <div className="h-[250px] w-full">
+   241→                <ResponsiveContainer width="100%" height="100%">
+   242→                  <BarChart data={stats.bookingsByType}>
+   243→                    <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+   244→                    <XAxis dataKey="type" tick={{ fontSize: 11 }} className="fill-muted-foreground" />
+   245→                    <YAxis tick={{ fontSize: 11 }} className="fill-muted-foreground" allowDecimals={false} />
+   246→                    <Tooltip
+   247→                      contentStyle={{
+   248→                        backgroundColor: "var(--popover)",
+   249→                        border: "1px solid var(--border)",
+   250→                        borderRadius: "var(--radius)",
+   251→                        color: "var(--popover-foreground)",
+   252→                      }}
+   253→                    />
+   254→                    <Bar dataKey="count" radius={[4, 4, 0, 0]}>
+   255→                      {stats.bookingsByType.map((entry, index) => (
+   256→                        <rect key={index} fill={typeColors[entry.type] || "var(--primary)"} />
+   257→                      ))}
+   258→                    </Bar>
+   259→                  </BarChart>
+   260→                </ResponsiveContainer>
+   261→              </div>
+   262→            </CardContent>
+   263→          </Card>
+   264→        )}
+   265→      </div>
+   266→
+   267→      {/* Recent Bookings */}
+   268→      <Card>
+   269→        <CardHeader className="pb-3">
+   270→          <CardTitle className="text-base font-semibold">Recent Bookings</CardTitle>
+   271→        </CardHeader>
+   272→        <CardContent>
+   273→          {stats.recentBookings.length === 0 ? (
+   274→            <p className="text-sm text-muted-foreground py-8 text-center">No bookings yet</p>
+   275→          ) : (
+   276→            <div className="overflow-x-auto">
+   277→              <Table>
+   278→                <TableHeader>
+   279→                  <TableRow>
+   280→                    <TableHead>Customer</TableHead>
+   281→                    <TableHead>Product</TableHead>
+   282→                    <TableHead>Type</TableHead>
+   283→                    <TableHead>Status</TableHead>
+   284→                    <TableHead className="text-right">Amount</TableHead>
+   285→                    <TableHead className="text-right">Date</TableHead>
+   286→                  </TableRow>
+   287→                </TableHeader>
+   288→                <TableBody>
+   289→                  {stats.recentBookings.slice(0, 10).map((b) => (
+   290→                    <TableRow key={b.id}>
+   291→                      <TableCell className="font-medium text-sm">{b.user?.name || "—"}</TableCell>
+   292→                      <TableCell className="text-sm max-w-[160px] truncate">{b.product?.title || "—"}</TableCell>
+   293→                      <TableCell>
+   294→                        <span className={`inline-flex items-center rounded-md px-1.5 py-0.5 text-[10px] font-medium ${BOOKING_TYPE_COLORS[b.bookingType]}`}>
+   295→                          {b.bookingType}
+   296→                        </span>
+   297→                      </TableCell>
+   298→                      <TableCell>
+   299→                        <span className={`inline-flex items-center rounded-md px-1.5 py-0.5 text-[10px] font-medium ${BOOKING_STATUS_COLORS[b.status]}`}>
+   300→                          {b.status}
+   301→                        </span>
+   302→                      </TableCell>
+   303→                      <TableCell className="text-right font-medium text-sm">{formatINR(b.totalPrice)}</TableCell>
+   304→                      <TableCell className="text-right text-xs text-muted-foreground">{formatDate(b.createdAt)}</TableCell>
+   305→                    </TableRow>
+   306→                  ))}
+   307→                </TableBody>
+   308→              </Table>
+   309→            </div>
+   310→          )}
+   311→        </CardContent>
+   312→      </Card>
+   313→    </motion.div>
+   314→  );
+   315→}
+   316→
+   317→// --- Users Tab ---
+   318→
+   319→interface AdminUser {
+   320→  id: string;
+   321→  name: string;
+   322→  email: string;
+   323→  role: UserRole;
+   324→  phone?: string;
+   325→  createdAt: string;
+   326→  vendor?: { businessName: string };
+   327→}
+   328→
+   329→function UsersTab() {
+   330→  const { token } = useAppStore();
+   331→  const [users, setUsers] = useState<AdminUser[]>([]);
+   332→  const [loading, setLoading] = useState(true);
+   333→  const [search, setSearch] = useState("");
+   334→  const [roleFilter, setRoleFilter] = useState<string>("ALL");
+   335→  const [searchInput, setSearchInput] = useState("");
+   336→
+   337→  const fetchUsers = useCallback(async () => {
+   338→    if (!token) return;
+   339→    setLoading(true);
+   340→    try {
+   341→      const params = new URLSearchParams();
+   342→      if (roleFilter !== "ALL") params.set("role", roleFilter);
+   343→      if (search) params.set("search", search);
+   344→      const res = await fetch(`/api/admin/users?${params}`, {
+   345→        headers: { Authorization: `Bearer ${token}` },
+   346→      });
+   347→      if (!res.ok) throw new Error("Failed to fetch users");
+   348→      const data = await res.json();
+   349→      setUsers(Array.isArray(data) ? data : data.users || []);
+   350→    } catch {
+   351→      toast.error("Failed to load users");
+   352→    } finally {
+   353→      setLoading(false);
+   354→    }
+   355→  }, [token, search, roleFilter]);
+   356→
+   357→  useEffect(() => {
+   358→    const timer = setTimeout(() => {
+   359→      if (searchInput !== search) {
+   360→        setSearch(searchInput);
+   361→      }
+   362→    }, 400);
+   363→    return () => clearTimeout(timer);
+   364→  }, [searchInput, search]);
+   365→
+   366→  useEffect(() => {
+   367→    fetchUsers();
+   368→  }, [fetchUsers]);
+   369→
+   370→  const roleBadgeColor = (role: string) => {
+   371→    switch (role) {
+   372→      case "ADMIN": return "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400";
+   373→      case "VENDOR": return "bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400";
+   374→      case "CUSTOMER": return "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400";
+   375→      default: return "bg-slate-100 text-slate-700 dark:bg-slate-900/30 dark:text-slate-400";
+   376→    }
+   377→  };
+   378→
+   379→  if (loading) return <TableSkeleton />;
+   380→
+   381→  return (
+   382→    <motion.div {...tabAnimation} className="space-y-4">
+   383→      {/* Filters */}
+   384→      <div className="flex flex-wrap gap-3 items-center">
+   385→        <div className="relative flex-1 min-w-[200px] max-w-sm">
+   386→          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+   387→          <Input
+   388→            placeholder="Search users by name or email..."
+   389→            value={searchInput}
+   390→            onChange={(e) => setSearchInput(e.target.value)}
+   391→            className="pl-10"
+   392→          />
+   393→        </div>
+   394→        <Select value={roleFilter} onValueChange={(v) => setRoleFilter(v)}>
+   395→          <SelectTrigger size="sm" className="w-[150px]">
+   396→            <SelectValue placeholder="Role" />
+   397→          </SelectTrigger>
+   398→          <SelectContent>
+   399→            <SelectItem value="ALL">All Roles</SelectItem>
+   400→            <SelectItem value="CUSTOMER">Customer</SelectItem>
+   401→            <SelectItem value="VENDOR">Vendor</SelectItem>
+   402→            <SelectItem value="ADMIN">Admin</SelectItem>
+   403→          </SelectContent>
+   404→        </Select>
+   405→      </div>
+   406→
+   407→      {/* Users Table */}
+   408→      <Card>
+   409→        <CardContent className="p-0">
+   410→          {users.length === 0 ? (
+   411→            <div className="py-12 text-center">
+   412→              <Users className="h-10 w-10 mx-auto text-muted-foreground/40 mb-3" />
+   413→              <p className="text-sm text-muted-foreground">No users found</p>
+   414→            </div>
+   415→          ) : (
+   416→            <div className="overflow-x-auto max-h-[500px] overflow-y-auto">
+   417→              <Table>
+   418→                <TableHeader>
+   419→                  <TableRow>
+   420→                    <TableHead>Name</TableHead>
+   421→                    <TableHead>Email</TableHead>
+   422→                    <TableHead>Role</TableHead>
+   423→                    <TableHead>Phone</TableHead>
+   424→                    <TableHead>Business Name</TableHead>
+   425→                    <TableHead className="text-right">Joined</TableHead>
+   426→                  </TableRow>
+   427→                </TableHeader>
+   428→                <TableBody>
+   429→                  {users.map((u) => (
+   430→                    <TableRow key={u.id}>
+   431→                      <TableCell className="font-medium text-sm">{u.name}</TableCell>
+   432→                      <TableCell className="text-sm text-muted-foreground">{u.email}</TableCell>
+   433→                      <TableCell>
+   434→                        <span className={`inline-flex items-center rounded-md px-2 py-0.5 text-[11px] font-medium ${roleBadgeColor(u.role)}`}>
+   435→                          {u.role}
+   436→                        </span>
+   437→                      </TableCell>
+   438→                      <TableCell className="text-sm text-muted-foreground">{u.phone || "—"}</TableCell>
+   439→                      <TableCell className="text-sm text-muted-foreground">{u.vendor?.businessName || "—"}</TableCell>
+   440→                      <TableCell className="text-right text-xs text-muted-foreground">{formatDate(u.createdAt)}</TableCell>
+   441→                    </TableRow>
+   442→                  ))}
+   443→                </TableBody>
+   444→              </Table>
+   445→            </div>
+   446→          )}
+   447→        </CardContent>
+   448→      </Card>
+   449→    </motion.div>
+   450→  );
+   451→}
+   452→
+   453→// --- Vendors Tab ---
+   454→
+   455→interface AdminVendor {
+   456→  id: string;
+   457→  userId: string;
+   458→  businessName: string;
+   459→  isVerified: boolean;
+   460→  isSuspended: boolean;
+   461→  productsCount: number;
+   462→  bookingsCount: number;
+   463→  user: { name: string; email: string; phone?: string };
+   464→}
+   465→
+   466→function VendorsTab() {
+   467→  const { token } = useAppStore();
+   468→  const [vendors, setVendors] = useState<AdminVendor[]>([]);
+   469→  const [loading, setLoading] = useState(true);
+   470→  const [actionLoading, setActionLoading] = useState<string | null>(null);
+   471→
+   472→  const fetchVendors = useCallback(async () => {
+   473→    if (!token) return;
+   474→    setLoading(true);
+   475→    try {
+   476→      const res = await fetch("/api/admin/vendors", {
+   477→        headers: { Authorization: `Bearer ${token}` },
+   478→      });
+   479→      if (!res.ok) throw new Error("Failed to fetch vendors");
+   480→      const data = await res.json();
+   481→      setVendors(Array.isArray(data) ? data : data.vendors || []);
+   482→    } catch {
+   483→      toast.error("Failed to load vendors");
+   484→    } finally {
+   485→      setLoading(false);
+   486→    }
+   487→  }, [token]);
+   488→
+   489→  useEffect(() => {
+   490→    fetchVendors();
+   491→  }, [fetchVendors]);
+   492→
+   493→  const handleAction = async (vendorId: string, action: "verify" | "suspend" | "unsuspend") => {
+   494→    if (!token) return;
+   495→    setActionLoading(vendorId);
+   496→    try {
+   497→      const res = await fetch("/api/admin/vendors", {
+   498→        method: "PUT",
+   499→        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+   500→        body: JSON.stringify({ vendorId, action }),
+   501→      });
+   502→      if (!res.ok) throw new Error("Action failed");
+   503→      toast.success(`Vendor ${action}d successfully`);
+   504→      fetchVendors();
+   505→    } catch {
+   506→      toast.error(`Failed to ${action} vendor`);
+   507→    } finally {
+   508→      setActionLoading(null);
+   509→    }
+   510→  };
+   511→
+   512→  if (loading) return <TableSkeleton rows={6} />;
+   513→
+   514→  return (
+   515→    <motion.div {...tabAnimation}>
+   516→      <Card>
+   517→        <CardContent className="p-0">
+   518→          {vendors.length === 0 ? (
+   519→            <div className="py-12 text-center">
+   520→              <Store className="h-10 w-10 mx-auto text-muted-foreground/40 mb-3" />
+   521→              <p className="text-sm text-muted-foreground">No vendors found</p>
+   522→            </div>
+   523→          ) : (
+   524→            <div className="overflow-x-auto max-h-[500px] overflow-y-auto">
+   525→              <Table>
+   526→                <TableHeader>
+   527→                  <TableRow>
+   528→                    <TableHead>Business Name</TableHead>
+   529→                    <TableHead>Admin Name</TableHead>
+   530→                    <TableHead>Email</TableHead>
+   531→                    <TableHead>Products</TableHead>
+   532→                    <TableHead>Bookings</TableHead>
+   533→                    <TableHead>Status</TableHead>
+   534→                    <TableHead className="text-right">Actions</TableHead>
+   535→                  </TableRow>
+   536→                </TableHeader>
+   537→                <TableBody>
+   538→                  {vendors.map((v) => (
+   539→                    <TableRow key={v.id}>
+   540→                      <TableCell className="font-medium text-sm">{v.businessName}</TableCell>
+   541→                      <TableCell className="text-sm">{v.user?.name || "—"}</TableCell>
+   542→                      <TableCell className="text-sm text-muted-foreground">{v.user?.email || "—"}</TableCell>
+   543→                      <TableCell className="text-sm text-center">{v.productsCount}</TableCell>
+   544→                      <TableCell className="text-sm text-center">{v.bookingsCount}</TableCell>
+   545→                      <TableCell>
+   546→                        <div className="flex items-center gap-1.5">
+   547→                          {v.isVerified && (
+   548→                            <Badge className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 text-[10px] border-0">
+   549→                              <CheckCircle className="h-3 w-3 mr-0.5" />
+   550→                              Verified
+   551→                            </Badge>
+   552→                          )}
+   553→                          {v.isSuspended && (
+   554→                            <Badge className="bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 text-[10px] border-0">
+   555→                              <Ban className="h-3 w-3 mr-0.5" />
+   556→                              Suspended
+   557→                            </Badge>
+   558→                          )}
+   559→                          {!v.isVerified && !v.isSuspended && (
+   560→                            <Badge className="bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 text-[10px] border-0">
+   561→                              <AlertCircle className="h-3 w-3 mr-0.5" />
+   562→                              Unverified
+   563→                            </Badge>
+   564→                          )}
+   565→                        </div>
+   566→                      </TableCell>
+   567→                      <TableCell className="text-right">
+   568→                        <div className="flex items-center justify-end gap-1.5">
+   569→                          {!v.isVerified && (
+   570→                            <Button
+   571→                              size="sm"
+   572→                              variant="outline"
+   573→                              className="h-7 text-xs text-emerald-600 border-emerald-300 hover:bg-emerald-50 dark:text-emerald-400 dark:border-emerald-800 dark:hover:bg-emerald-900/20"
+   574→                              disabled={actionLoading === v.id}
+   575→                              onClick={() => handleAction(v.id, "verify")}
+   576→                            >
+   577→                              {actionLoading === v.id ? (
+   578→                                <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+   579→                              ) : (
+   580→                                <Shield className="h-3 w-3 mr-1" />
+   581→                              )}
+   582→                              Verify
+   583→                            </Button>
+   584→                          )}
+   585→                          {v.isSuspended ? (
+   586→                            <Button
+   587→                              size="sm"
+   588→                              variant="outline"
+   589→                              className="h-7 text-xs text-primary border-primary/30 hover:bg-primary/5 dark:border-primary/50"
+   590→                              disabled={actionLoading === v.id}
+   591→                              onClick={() => handleAction(v.id, "unsuspend")}
+   592→                            >
+   593→                              {actionLoading === v.id ? (
+   594→                                <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+   595→                              ) : (
+   596→                                <Check className="h-3 w-3 mr-1" />
+   597→                              )}
+   598→                              Un-suspend
+   599→                            </Button>
+   600→                          ) : (
+   601→                            <Button
+   602→                              size="sm"
+   603→                              variant="outline"
+   604→                              className="h-7 text-xs text-red-600 border-red-300 hover:bg-red-50 dark:text-red-400 dark:border-red-800 dark:hover:bg-red-900/20"
+   605→                              disabled={actionLoading === v.id}
+   606→                              onClick={() => handleAction(v.id, "suspend")}
+   607→                            >
+   608→                              {actionLoading === v.id ? (
+   609→                                <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+   610→                              ) : (
+   611→                                <Ban className="h-3 w-3 mr-1" />
+   612→                              )}
+   613→                              Suspend
+   614→                            </Button>
+   615→                          )}
+   616→                        </div>
+   617→                      </TableCell>
+   618→                    </TableRow>
+   619→                  ))}
+   620→                </TableBody>
+   621→              </Table>
+   622→            </div>
+   623→          )}
+   624→        </CardContent>
+   625→      </Card>
+   626→    </motion.div>
+   627→  );
+   628→}
+   629→
+   630→// --- Products Tab ---
+   631→
+   632→interface AdminProduct {
+   633→  id: string;
+   634→  title: string;
+   635→  vendor: { businessName: string; isVerified: boolean };
+   636→  category: { name: string };
+   637→  rentPricePerDay: number;
+   638→  buyPrice: number;
+   639→  stock: number;
+   640→  status: ProductStatus;
+   641→  _count?: { bookings: number; reviews: number };
+   642→}
+   643→
+   644→function ProductsTab() {
+   645→  const { token } = useAppStore();
+   646→  const [products, setProducts] = useState<AdminProduct[]>([]);
+   647→  const [loading, setLoading] = useState(true);
+   648→  const [searchInput, setSearchInput] = useState("");
+   649→  const [search, setSearch] = useState("");
+   650→  const [togglingId, setTogglingId] = useState<string | null>(null);
+   651→
+   652→  const fetchProducts = useCallback(async () => {
+   653→    if (!token) return;
+   654→    setLoading(true);
+   655→    try {
+   656→      const params = new URLSearchParams();
+   657→      if (search) params.set("search", search);
+   658→      const res = await fetch(`/api/admin/products?${params}`, {
+   659→        headers: { Authorization: `Bearer ${token}` },
+   660→      });
+   661→      if (!res.ok) throw new Error("Failed to fetch products");
+   662→      const data = await res.json();
+   663→      setProducts(Array.isArray(data) ? data : data.products || []);
+   664→    } catch {
+   665→      toast.error("Failed to load products");
+   666→    } finally {
+   667→      setLoading(false);
+   668→    }
+   669→  }, [token, search]);
+   670→
+   671→  useEffect(() => {
+   672→    const timer = setTimeout(() => {
+   673→      if (searchInput !== search) {
+   674→        setSearch(searchInput);
+   675→      }
+   676→    }, 400);
+   677→    return () => clearTimeout(timer);
+   678→  }, [searchInput, search]);
+   679→
+   680→  useEffect(() => {
+   681→    fetchProducts();
+   682→  }, [fetchProducts]);
+   683→
+   684→  const handleToggle = async (productId: string, currentStatus: ProductStatus) => {
+   685→    if (!token) return;
+   686→    const newStatus: ProductStatus = currentStatus === "AVAILABLE" ? "UNAVAILABLE" : "AVAILABLE";
+   687→    setTogglingId(productId);
+   688→    try {
+   689→      const res = await fetch("/api/admin/products", {
+   690→        method: "PUT",
+   691→        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+   692→        body: JSON.stringify({ productId, status: newStatus }),
+   693→      });
+   694→      if (!res.ok) throw new Error("Failed to update product");
+   695→      toast.success(`Product ${newStatus.toLowerCase()}`);
+   696→      fetchProducts();
+   697→    } catch {
+   698→      toast.error("Failed to update product status");
+   699→    } finally {
+   700→      setTogglingId(null);
+   701→    }
+   702→  };
+   703→
+   704→  if (loading) return <TableSkeleton />;
+   705→
+   706→  return (
+   707→    <motion.div {...tabAnimation} className="space-y-4">
+   708→      <div className="relative max-w-sm">
+   709→        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+   710→        <Input
+   711→          placeholder="Search products..."
+   712→          value={searchInput}
+   713→          onChange={(e) => setSearchInput(e.target.value)}
+   714→          className="pl-10"
+   715→        />
+   716→      </div>
+   717→
+   718→      <Card>
+   719→        <CardContent className="p-0">
+   720→          {products.length === 0 ? (
+   721→            <div className="py-12 text-center">
+   722→              <Package className="h-10 w-10 mx-auto text-muted-foreground/40 mb-3" />
+   723→              <p className="text-sm text-muted-foreground">No products found</p>
+   724→            </div>
+   725→          ) : (
+   726→            <div className="overflow-x-auto max-h-[500px] overflow-y-auto">
+   727→              <Table>
+   728→                <TableHeader>
+   729→                  <TableRow>
+   730→                    <TableHead>Title</TableHead>
+   731→                    <TableHead>Vendor</TableHead>
+   732→                    <TableHead>Category</TableHead>
+   733→                    <TableHead className="text-right">Price/Day</TableHead>
+   734→                    <TableHead className="text-center">Stock</TableHead>
+   735→                    <TableHead>Status</TableHead>
+   736→                    <TableHead className="text-center">Bookings</TableHead>
+   737→                    <TableHead className="text-center">Reviews</TableHead>
+   738→                    <TableHead className="text-right">Toggle</TableHead>
+   739→                  </TableRow>
+   740→                </TableHeader>
+   741→                <TableBody>
+   742→                  {products.map((p) => (
+   743→                    <TableRow key={p.id}>
+   744→                      <TableCell className="font-medium text-sm max-w-[180px] truncate">{p.title}</TableCell>
+   745→                      <TableCell className="text-sm">
+   746→                        <div className="flex items-center gap-1.5">
+   747→                          {p.vendor?.businessName || "—"}
+   748→                          {p.vendor?.isVerified && (
+   749→                            <CheckCircle className="h-3 w-3 text-emerald-500 shrink-0" />
+   750→                          )}
+   751→                        </div>
+   752→                      </TableCell>
+   753→                      <TableCell className="text-sm text-muted-foreground">{p.category?.name || "—"}</TableCell>
+   754→                      <TableCell className="text-right text-sm font-medium">{formatINR(p.rentPricePerDay)}</TableCell>
+   755→                      <TableCell className="text-center text-sm">{p.stock}</TableCell>
+   756→                      <TableCell>
+   757→                        <Badge
+   758→                          className={`text-[10px] border-0 ${
+   759→                            p.status === "AVAILABLE"
+   760→                              ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400"
+   761→                              : "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
+   762→                          }`}
+   763→                        >
+   764→                          {p.status}
+   765→                        </Badge>
+   766→                      </TableCell>
+   767→                      <TableCell className="text-center text-sm">{p._count?.bookings || 0}</TableCell>
+   768→                      <TableCell className="text-center text-sm">{p._count?.reviews || 0}</TableCell>
+   769→                      <TableCell className="text-right">
+   770→                        <Switch
+   771→                          checked={p.status === "AVAILABLE"}
+   772→                          disabled={togglingId === p.id}
+   773→                          onCheckedChange={() => handleToggle(p.id, p.status)}
+   774→                        />
+   775→                      </TableCell>
+   776→                    </TableRow>
+   777→                  ))}
+   778→                </TableBody>
+   779→              </Table>
+   780→            </div>
+   781→          )}
+   782→        </CardContent>
+   783→      </Card>
+   784→    </motion.div>
+   785→  );
+   786→}
+   787→
+   788→// --- Bookings Tab ---
+   789→
+   790→function AdminBookingsTab() {
+   791→  const { token } = useAppStore();
+   792→  const [bookings, setBookings] = useState<AppBooking[]>([]);
+   793→  const [loading, setLoading] = useState(true);
+   794→  const [statusFilter, setStatusFilter] = useState<string>("ALL");
+   795→
+   796→  const fetchBookings = useCallback(async () => {
+   797→    if (!token) return;
+   798→    setLoading(true);
+   799→    try {
+   800→      const params = new URLSearchParams();
+   801→      if (statusFilter !== "ALL") params.set("status", statusFilter);
+   802→      const res = await fetch(`/api/admin/bookings?${params}`, {
+   803→        headers: { Authorization: `Bearer ${token}` },
+   804→      });
+   805→      if (!res.ok) throw new Error("Failed to fetch bookings");
+   806→      const data = await res.json();
+   807→      setBookings(Array.isArray(data) ? data : data.bookings || []);
+   808→    } catch {
+   809→      toast.error("Failed to load bookings");
+   810→    } finally {
+   811→      setLoading(false);
+   812→    }
+   813→  }, [token, statusFilter]);
+   814→
+   815→  useEffect(() => {
+   816→    fetchBookings();
+   817→  }, [fetchBookings]);
+   818→
+   819→  if (loading) return <TableSkeleton />;
+   820→
+   821→  return (
+   822→    <motion.div {...tabAnimation} className="space-y-4">
+   823→      <div className="flex flex-wrap gap-3 items-center">
+   824→        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+   825→          <Filter className="h-4 w-4" />
+   826→          <span className="font-medium">Status:</span>
+   827→        </div>
+   828→        <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v)}>
+   829→          <SelectTrigger size="sm" className="w-[160px]">
+   830→            <SelectValue placeholder="All Statuses" />
+   831→          </SelectTrigger>
+   832→          <SelectContent>
+   833→            <SelectItem value="ALL">All Statuses</SelectItem>
+   834→            <SelectItem value="PENDING">Pending</SelectItem>
+   835→            <SelectItem value="APPROVED">Approved</SelectItem>
+   836→            <SelectItem value="CONFIRMED">Confirmed</SelectItem>
+   837→            <SelectItem value="DELIVERED">Delivered</SelectItem>
+   838→            <SelectItem value="RETURNED">Returned</SelectItem>
+   839→            <SelectItem value="COMPLETED">Completed</SelectItem>
+   840→            <SelectItem value="CANCELLED">Cancelled</SelectItem>
+   841→            <SelectItem value="REJECTED">Rejected</SelectItem>
+   842→          </SelectContent>
+   843→        </Select>
+   844→      </div>
+   845→
+   846→      <Card>
+   847→        <CardContent className="p-0">
+   848→          {bookings.length === 0 ? (
+   849→            <div className="py-12 text-center">
+   850→              <Calendar className="h-10 w-10 mx-auto text-muted-foreground/40 mb-3" />
+   851→              <p className="text-sm text-muted-foreground">No bookings found</p>
+   852→            </div>
+   853→          ) : (
+   854→            <div className="overflow-x-auto max-h-[500px] overflow-y-auto">
+   855→              <Table>
+   856→                <TableHeader>
+   857→                  <TableRow>
+   858→                    <TableHead>Customer</TableHead>
+   859→                    <TableHead>Product</TableHead>
+   860→                    <TableHead>Vendor</TableHead>
+   861→                    <TableHead>Type</TableHead>
+   862→                    <TableHead>Dates</TableHead>
+   863→                    <TableHead className="text-right">Total</TableHead>
+   864→                    <TableHead>Payment</TableHead>
+   865→                    <TableHead>Status</TableHead>
+   866→                  </TableRow>
+   867→                </TableHeader>
+   868→                <TableBody>
+   869→                  {bookings.map((b) => (
+   870→                    <TableRow key={b.id}>
+   871→                      <TableCell className="font-medium text-sm">{b.user?.name || "—"}</TableCell>
+   872→                      <TableCell className="text-sm max-w-[140px] truncate">{b.product?.title || "—"}</TableCell>
+   873→                      <TableCell className="text-sm text-muted-foreground">—</TableCell>
+   874→                      <TableCell>
+   875→                        <span className={`inline-flex items-center rounded-md px-1.5 py-0.5 text-[10px] font-medium ${BOOKING_TYPE_COLORS[b.bookingType]}`}>
+   876→                          {b.bookingType}
+   877→                        </span>
+   878→                      </TableCell>
+   879→                      <TableCell className="text-xs text-muted-foreground">
+   880→                        {b.startDate && b.endDate
+   881→                          ? `${formatDate(b.startDate)} – ${formatDate(b.endDate)}`
+   882→                          : "—"}
+   883→                      </TableCell>
+   884→                      <TableCell className="text-right font-medium text-sm">{formatINR(b.totalPrice)}</TableCell>
+   885→                      <TableCell>
+   886→                        <span className={`text-[10px] font-medium capitalize ${
+   887→                          b.payment?.paymentStatus === "COMPLETED"
+   888→                            ? "text-emerald-600 dark:text-emerald-400"
+   889→                            : b.payment?.paymentStatus === "FAILED"
+   890→                            ? "text-red-600 dark:text-red-400"
+   891→                            : "text-amber-600 dark:text-amber-400"
+   892→                        }`}>
+   893→                          {b.payment?.paymentStatus || "—"}
+   894→                        </span>
+   895→                      </TableCell>
+   896→                      <TableCell>
+   897→                        <span className={`inline-flex items-center rounded-md px-1.5 py-0.5 text-[10px] font-medium ${BOOKING_STATUS_COLORS[b.status]}`}>
+   898→                          {b.status}
+   899→                        </span>
+   900→                      </TableCell>
+   901→                    </TableRow>
+   902→                  ))}
+   903→                </TableBody>
+   904→              </Table>
+   905→            </div>
+   906→          )}
+   907→        </CardContent>
+   908→      </Card>
+   909→    </motion.div>
+   910→  );
+   911→}
+   912→
+   913→// --- Main Component ---
+   914→
+   915→export default function AdminDashboard() {
+   916→  const { adminTab, setAdminTab, token, navigateTo } = useAppStore();
+   917→  const [stats, setStats] = useState<AdminStats | null>(null);
+   918→  const [loading, setLoading] = useState(true);
+   919→
+   920→  useEffect(() => {
+   921→    if (!token) return;
+   922→    async function fetchStats() {
+   923→      try {
+   924→        const res = await fetch("/api/admin/stats", {
+   925→          headers: { Authorization: `Bearer ${token}` },
+   926→        });
+   927→        if (!res.ok) throw new Error("Failed to fetch stats");
+   928→        const data = await res.json();
+   929→        setStats(data);
+   930→      } catch {
+   931→        toast.error("Failed to load admin stats");
+   932→      } finally {
+   933→        setLoading(false);
+   934→      }
+   935→    }
+   936→    fetchStats();
+   937→  }, [token]);
+   938→
+   939→  return (
+   940→    <div className="space-y-6">
+   941→      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+   942→        <div>
+   943→          <h2 className="text-2xl font-bold tracking-tight">Admin Dashboard</h2>
+   944→          <p className="text-sm text-muted-foreground mt-1">Platform management, user oversight, and system analytics</p>
+   945→        </div>
+   946→        <Button
+   947→          variant="outline"
+   948→          size="sm"
+   949→          onClick={() => navigateTo("marketplace")}
+   950→          className="gap-2 rounded-full self-start"
+   951→        >
+   952→          <ArrowLeft className="h-4 w-4" />
+   953→          Back to Marketplace
+   954→        </Button>
+   955→      </div>
+   956→
+   957→      <Tabs
+   958→        value={adminTab}
+   959→        onValueChange={(v) => setAdminTab(v as typeof adminTab)}
+   960→        className="w-full"
+   961→      >
+   962→        <TabsList className="flex-wrap h-auto gap-1 p-1">
+   963→          <TabsTrigger value="overview" className="text-xs sm:text-sm">
+   964→            <Eye className="h-3.5 w-3.5 sm:mr-1.5" />
+   965→            <span className="hidden sm:inline">Overview</span>
+   966→          </TabsTrigger>
+   967→          <TabsTrigger value="users" className="text-xs sm:text-sm">
+   968→            <Users className="h-3.5 w-3.5 sm:mr-1.5" />
+   969→            <span className="hidden sm:inline">Users</span>
+   970→          </TabsTrigger>
+   971→          <TabsTrigger value="vendors" className="text-xs sm:text-sm">
+   972→            <Store className="h-3.5 w-3.5 sm:mr-1.5" />
+   973→            <span className="hidden sm:inline">Vendors</span>
+   974→          </TabsTrigger>
+   975→          <TabsTrigger value="products" className="text-xs sm:text-sm">
+   976→            <Package className="h-3.5 w-3.5 sm:mr-1.5" />
+   977→            <span className="hidden sm:inline">Products</span>
+   978→          </TabsTrigger>
+   979→          <TabsTrigger value="bookings" className="text-xs sm:text-sm">
+   980→            <Calendar className="h-3.5 w-3.5 sm:mr-1.5" />
+   981→            <span className="hidden sm:inline">Bookings</span>
+   982→          </TabsTrigger>
+   983→        </TabsList>
+   984→
+   985→        <AnimatePresence mode="wait">
+   986→          {adminTab === "overview" && (
+   987→            <TabsContent value="overview">
+   988→              <AdminOverviewTab stats={loading ? null : stats} />
+   989→            </TabsContent>
+   990→          )}
+   991→          {adminTab === "users" && (
+   992→            <TabsContent value="users">
+   993→              <UsersTab />
+   994→            </TabsContent>
+   995→          )}
+   996→          {adminTab === "vendors" && (
+   997→            <TabsContent value="vendors">
+   998→              <VendorsTab />
+   999→            </TabsContent>
+  1000→          )}
+  1001→          {adminTab === "products" && (
+  1002→            <TabsContent value="products">
+  1003→              <ProductsTab />
+  1004→            </TabsContent>
+  1005→          )}
+  1006→          {adminTab === "bookings" && (
+  1007→            <TabsContent value="bookings">
+  1008→              <AdminBookingsTab />
+  1009→            </TabsContent>
+  1010→          )}
+  1011→        </AnimatePresence>
+  1012→      </Tabs>
+  1013→    </div>
+  1014→  );
+  1015→}
