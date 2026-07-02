@@ -69,11 +69,17 @@ ${category ? `Category: ${category}` : ""}`;
 
     return NextResponse.json(result);
   } catch (error: unknown) {
-    console.error("ZenMux description generation error:", error);
-
+    console.error("ZenMux AI error:", error);
+  
     const message =
       error instanceof Error ? error.message : "Description generation failed";
-
-    return NextResponse.json({ error: message }, { status: 500 });
+  
+    return NextResponse.json(
+      {
+        error: message,
+        provider: "ZenMux",
+      },
+      { status: 500 }
+    );
   }
 }
