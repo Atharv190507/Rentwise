@@ -188,3 +188,21 @@ Stage Summary:
 - Prominent "Plan My Event with AI" section on marketplace homepage
 - Customer dashboard shows saved event plans with status management
 - Note: z-ai-web-dev-sdk must be lazily imported (not static) in event-plan route due to Turbopack compilation issue
+
+---
+Task ID: fix-categories-price
+Agent: Main Agent
+Task: Fix Browse by Category not showing + Price Range label and display issues
+
+Work Log:
+- Diagnosed categories not showing: Prisma client was stale after DB seed, regenerated with `bunx prisma generate` and re-seeded DB
+- Verified /api/categories now returns all 10 categories with product counts
+- Changed "Price Range (per day)" label to "Price Range" in MarketplaceView.tsx
+- Improved price display below slider: larger font (text-sm), font-semibold, foreground color, bg-muted/60 pill badges, "to" separator between min/max values
+- ₹ currency symbol was already present via Unicode \u20B9, maintained in the improved display
+- Ran lint check - no errors
+
+Stage Summary:
+- Categories now properly fetch and display from API (10 categories: Cameras, Speakers, Projectors, Lighting, Microphones, LED Walls, Furniture, Tents & Canopies, Decoration, Stage Equipment)
+- Price Range label no longer says "per day"
+- Price values below slider are more visible with styled badges showing ₹ format

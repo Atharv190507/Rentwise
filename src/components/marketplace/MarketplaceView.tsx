@@ -267,7 +267,7 @@ export default function MarketplaceView() {
 
       {/* Price Range */}
       <div className="space-y-3">
-        <Label className="text-sm font-medium">Price Range (per day)</Label>
+        <Label className="text-sm font-medium">Price Range</Label>
         <Slider
           min={0}
           max={50000}
@@ -278,9 +278,14 @@ export default function MarketplaceView() {
             setPage(1);
           }}
         />
-        <div className="flex justify-between text-xs text-muted-foreground">
-          <span>\u20B9{priceRange[0].toLocaleString("en-IN")}</span>
-          <span>\u20B9{priceRange[1].toLocaleString("en-IN")}</span>
+        <div className="flex items-center justify-between">
+          <span className="text-sm font-semibold text-foreground bg-muted/60 px-2.5 py-1 rounded-md">
+            {"\u20B9"}{priceRange[0].toLocaleString("en-IN")}
+          </span>
+          <span className="text-xs text-muted-foreground">to</span>
+          <span className="text-sm font-semibold text-foreground bg-muted/60 px-2.5 py-1 rounded-md">
+            {"\u20B9"}{priceRange[1].toLocaleString("en-IN")}
+          </span>
         </div>
       </div>
 

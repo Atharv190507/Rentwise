@@ -1,0 +1,776 @@
+     1→"use client";
+     2→
+     3→import { useState, useEffect, useCallback } from "react";
+     4→import { motion, AnimatePresence } from "framer-motion";
+     5→import {
+     6→  Search,
+     7→  SlidersHorizontal,
+     8→  Sparkles,
+     9→  X,
+    10→  PackageOpen,
+    11→  Store,
+    12→  Package,
+    13→  ShieldCheck,
+    14→  Wallet,
+    15→  CalendarCheck,
+    16→  ArrowRight,
+    17→  ChevronRight,
+    18→} from "lucide-react";
+    19→import { Button } from "@/components/ui/button";
+    20→import { Input } from "@/components/ui/input";
+    21→import { Badge } from "@/components/ui/badge";
+    22→import { Slider } from "@/components/ui/slider";
+    23→import { Skeleton } from "@/components/ui/skeleton";
+    24→import {
+    25→  Select,
+    26→  SelectContent,
+    27→  SelectItem,
+    28→  SelectTrigger,
+    29→  SelectValue,
+    30→} from "@/components/ui/select";
+    31→import {
+    32→  Sheet,
+    33→  SheetContent,
+    34→  SheetHeader,
+    35→  SheetTitle,
+    36→  SheetTrigger,
+    37→} from "@/components/ui/sheet";
+    38→import {
+    39→  Pagination,
+    40→  PaginationContent,
+    41→  PaginationItem,
+    42→  PaginationLink,
+    43→  PaginationNext,
+    44→  PaginationPrevious,
+    45→  PaginationEllipsis,
+    46→} from "@/components/ui/pagination";
+    47→import { Separator } from "@/components/ui/separator";
+    48→import { Label } from "@/components/ui/label";
+    49→import { useAppStore } from "@/stores/app-store";
+    50→import ProductCard, { ProductCardSkeleton } from "./ProductCard";
+    51→import HeroSection from "./HeroSection";
+    52→import CategoriesShowcase from "./CategoriesShowcase";
+    53→import HowItWorks from "./HowItWorks";
+    54→import WhyRentWise from "./WhyRentWise";
+    55→import type { AppProduct, AppCategory, ProductCondition, BookingType } from "@/lib/types";
+    56→
+    57→const ITEMS_PER_PAGE = 12;
+    58→
+    59→const CONDITION_OPTIONS: { value: ProductCondition | "ALL"; label: string }[] = [
+    60→  { value: "ALL", label: "All Conditions" },
+    61→  { value: "NEW", label: "New" },
+    62→  { value: "LIKE_NEW", label: "Like New" },
+    63→  { value: "GOOD", label: "Good" },
+    64→  { value: "FAIR", label: "Fair" },
+    65→];
+    66→
+    67→const SORT_OPTIONS = [
+    68→  { value: "newest", label: "Newest First" },
+    69→  { value: "price_low", label: "Price: Low to High" },
+    70→  { value: "price_high", label: "Price: High to Low" },
+    71→  { value: "rating", label: "Highest Rated" },
+    72→  { value: "popular", label: "Most Popular" },
+    73→];
+    74→
+    75→export default function MarketplaceView() {
+    76→  const { navigateTo, openAuthDialog, user, token } = useAppStore();
+    77→  const isVendor = user?.role === "VENDOR";
+    78→
+    79→  // Data
+    80→  const [categories, setCategories] = useState<AppCategory[]>([]);
+    81→  const [products, setProducts] = useState<AppProduct[]>([]);
+    82→  const [totalCount, setTotalCount] = useState(0);
+    83→  const [loading, setLoading] = useState(true);
+    84→  const [categoriesLoading, setCategoriesLoading] = useState(true);
+    85→
+    86→  // Filters
+    87→  const [searchQuery, setSearchQuery] = useState("");
+    88→  const [activeSearch, setActiveSearch] = useState("");
+    89→  const [selectedCategory, setSelectedCategory] = useState<string>("ALL");
+    90→  const [bookingType, setBookingType] = useState<"ALL" | BookingType>("ALL");
+    91→  const [priceRange, setPriceRange] = useState<[number, number]>([0, 50000]);
+    92→  const [condition, setCondition] = useState<ProductCondition | "ALL">("ALL");
+    93→  const [sortBy, setSortBy] = useState("newest");
+    94→  const [page, setPage] = useState(1);
+    95→
+    96→  // Mobile filter sheet
+    97→  const [filterSheetOpen, setFilterSheetOpen] = useState(false);
+    98→
+    99→  // Listen for search events from Navbar / Hero
+   100→  useEffect(() => {
+   101→    const handler = (e: Event) => {
+   102→      const customEvent = e as CustomEvent<string>;
+   103→      const query = customEvent.detail;
+   104→      setActiveSearch(query);
+   105→      setSearchQuery(query);
+   106→      setPage(1);
+   107→      // Scroll to marketplace content
+   108→      const el = document.getElementById("marketplace-content");
+   109→      if (el) {
+   110→        setTimeout(() => {
+   111→          el.scrollIntoView({ behavior: "smooth", block: "start" });
+   112→        }, 100);
+   113→      }
+   114→    };
+   115→    window.addEventListener("marketplace-search", handler);
+   116→    return () => window.removeEventListener("marketplace-search", handler);
+   117→  }, []);
+   118→
+   119→  // Listen for category filter events from CategoriesShowcase
+   120→  useEffect(() => {
+   121→    const handler = (e: Event) => {
+   122→      const customEvent = e as CustomEvent<string>;
+   123→      const categoryId = customEvent.detail;
+   124→      setSelectedCategory(categoryId);
+   125→      setPage(1);
+   126→      // Scroll to marketplace content
+   127→      const el = document.getElementById("marketplace-content");
+   128→      if (el) {
+   129→        setTimeout(() => {
+   130→          el.scrollIntoView({ behavior: "smooth", block: "start" });
+   131→        }, 100);
+   132→      }
+   133→    };
+   134→    window.addEventListener("marketplace-category-filter", handler);
+   135→    return () => window.removeEventListener("marketplace-category-filter", handler);
+   136→  }, []);
+   137→
+   138→  // Fetch categories
+   139→  useEffect(() => {
+   140→    const fetchCategories = async () => {
+   141→      setCategoriesLoading(true);
+   142→      try {
+   143→        const res = await fetch("/api/categories");
+   144→        if (res.ok) {
+   145→          const data = await res.json();
+   146→          setCategories(data);
+   147→        }
+   148→      } catch {
+   149→        // Categories optional
+   150→      } finally {
+   151→        setCategoriesLoading(false);
+   152→      }
+   153→    };
+   154→    fetchCategories();
+   155→  }, []);
+   156→
+   157→  // Fetch products
+   158→  const fetchProducts = useCallback(async () => {
+   159→    setLoading(true);
+   160→    try {
+   161→      if (isVendor && token) {
+   162→        // Vendor sees only their own products
+   163→        const res = await fetch("/api/vendors/products", {
+   164→          headers: { Authorization: `Bearer ${token}` },
+   165→        });
+   166→        if (res.ok) {
+   167→          const data = await res.json();
+   168→          let vendorProducts: AppProduct[] = data.products || data || [];
+   169→          // Apply search filter client-side
+   170→          if (activeSearch) {
+   171→            const q = activeSearch.toLowerCase();
+   172→            vendorProducts = vendorProducts.filter((p) =>
+   173→              p.title.toLowerCase().includes(q)
+   174→            );
+   175→          }
+   176→          // Apply category filter client-side
+   177→          if (selectedCategory !== "ALL") {
+   178→            vendorProducts = vendorProducts.filter(
+   179→              (p) => p.categoryId === selectedCategory
+   180→            );
+   181→          }
+   182→          setProducts(vendorProducts);
+   183→          setTotalCount(vendorProducts.length);
+   184→        }
+   185→      } else {
+   186→        const params = new URLSearchParams();
+   187→        params.set("page", page.toString());
+   188→        params.set("limit", ITEMS_PER_PAGE.toString());
+   189→        if (activeSearch) params.set("search", activeSearch);
+   190→        if (selectedCategory !== "ALL") params.set("categoryId", selectedCategory);
+   191→        if (bookingType !== "ALL") params.set("bookingType", bookingType);
+   192→        if (condition !== "ALL") params.set("condition", condition);
+   193→        if (priceRange[0] > 0) params.set("minPrice", priceRange[0].toString());
+   194→        if (priceRange[1] < 50000) params.set("maxPrice", priceRange[1].toString());
+   195→        if (sortBy) params.set("sort", sortBy);
+   196→
+   197→        const res = await fetch(`/api/products?${params.toString()}`);
+   198→        if (res.ok) {
+   199→          const data = await res.json();
+   200→          setProducts(data.products || data);
+   201→          setTotalCount(data.total || (Array.isArray(data) ? data.length : 0));
+   202→        }
+   203→      }
+   204→    } catch {
+   205→      // silently fail
+   206→    } finally {
+   207→      setLoading(false);
+   208→    }
+   209→  }, [page, activeSearch, selectedCategory, bookingType, condition, priceRange, sortBy, isVendor, token]);
+   210→
+   211→  useEffect(() => {
+   212→    fetchProducts();
+   213→  }, [fetchProducts]);
+   214→
+   215→  const totalPages = Math.ceil(totalCount / ITEMS_PER_PAGE);
+   216→
+   217→  const handleSearchSubmit = (e: React.FormEvent) => {
+   218→    e.preventDefault();
+   219→    setActiveSearch(searchQuery);
+   220→    setPage(1);
+   221→  };
+   222→
+   223→  const clearFilters = () => {
+   224→    setSearchQuery("");
+   225→    setActiveSearch("");
+   226→    setSelectedCategory("ALL");
+   227→    setBookingType("ALL");
+   228→    setPriceRange([0, 50000]);
+   229→    setCondition("ALL");
+   230→    setSortBy("newest");
+   231→    setPage(1);
+   232→  };
+   233→
+   234→  const hasActiveFilters =
+   235→    activeSearch ||
+   236→    selectedCategory !== "ALL" ||
+   237→    bookingType !== "ALL" ||
+   238→    condition !== "ALL" ||
+   239→    priceRange[0] > 0 ||
+   240→    priceRange[1] < 50000;
+   241→
+   242→  // Sidebar Filters Content (shared between desktop and mobile)
+   243→  const FiltersContent = () => (
+   244→    <div className="space-y-6">
+   245→      {/* Booking Type */}
+   246→      <div className="space-y-2">
+   247→        <Label className="text-sm font-medium">Booking Type</Label>
+   248→        <div className="flex gap-2">
+   249→          {(["ALL", "RENT", "BUY", "BOOK"] as const).map((type) => (
+   250→            <Button
+   251→              key={type}
+   252→              variant={bookingType === type ? "default" : "outline"}
+   253→              size="sm"
+   254→              className="rounded-full text-xs flex-1"
+   255→              onClick={() => {
+   256→                setBookingType(type);
+   257→                setPage(1);
+   258→              }}
+   259→            >
+   260→              {type === "ALL" ? "All" : type.charAt(0) + type.slice(1).toLowerCase()}
+   261→            </Button>
+   262→          ))}
+   263→        </div>
+   264→      </div>
+   265→
+   266→      <Separator />
+   267→
+   268→      {/* Price Range */}
+   269→      <div className="space-y-3">
+   270→        <Label className="text-sm font-medium">Price Range (per day)</Label>
+   271→        <Slider
+   272→          min={0}
+   273→          max={50000}
+   274→          step={500}
+   275→          value={priceRange}
+   276→          onValueChange={(val) => {
+   277→            setPriceRange(val as [number, number]);
+   278→            setPage(1);
+   279→          }}
+   280→        />
+   281→        <div className="flex justify-between text-xs text-muted-foreground">
+   282→          <span>\u20B9{priceRange[0].toLocaleString("en-IN")}</span>
+   283→          <span>\u20B9{priceRange[1].toLocaleString("en-IN")}</span>
+   284→        </div>
+   285→      </div>
+   286→
+   287→      <Separator />
+   288→
+   289→      {/* Condition */}
+   290→      <div className="space-y-2">
+   291→        <Label className="text-sm font-medium">Condition</Label>
+   292→        <Select
+   293→          value={condition}
+   294→          onValueChange={(val) => {
+   295→            setCondition(val as ProductCondition | "ALL");
+   296→            setPage(1);
+   297→          }}
+   298→        >
+   299→          <SelectTrigger className="w-full">
+   300→            <SelectValue />
+   301→          </SelectTrigger>
+   302→          <SelectContent>
+   303→            {CONDITION_OPTIONS.map((opt) => (
+   304→              <SelectItem key={opt.value} value={opt.value}>
+   305→                {opt.label}
+   306→              </SelectItem>
+   307→            ))}
+   308→          </SelectContent>
+   309→        </Select>
+   310→      </div>
+   311→
+   312→      <Separator />
+   313→
+   314→      {/* Sort By */}
+   315→      <div className="space-y-2">
+   316→        <Label className="text-sm font-medium">Sort By</Label>
+   317→        <Select
+   318→          value={sortBy}
+   319→          onValueChange={(val) => {
+   320→            setSortBy(val);
+   321→            setPage(1);
+   322→          }}
+   323→        >
+   324→          <SelectTrigger className="w-full">
+   325→            <SelectValue />
+   326→          </SelectTrigger>
+   327→          <SelectContent>
+   328→            {SORT_OPTIONS.map((opt) => (
+   329→              <SelectItem key={opt.value} value={opt.value}>
+   330→                {opt.label}
+   331→              </SelectItem>
+   332→            ))}
+   333→          </SelectContent>
+   334→        </Select>
+   335→      </div>
+   336→
+   337→      {hasActiveFilters && (
+   338→        <>
+   339→          <Separator />
+   340→          <Button
+   341→            variant="ghost"
+   342→            size="sm"
+   343→            className="w-full text-muted-foreground"
+   344→            onClick={clearFilters}
+   345→          >
+   346→            <X className="mr-2 h-3.5 w-3.5" />
+   347→            Clear all filters
+   348→          </Button>
+   349→        </>
+   350→      )}
+   351→    </div>
+   352→  );
+   353→
+   354→  return (
+   355→    <div className="flex-1">
+   356→      {/* Vendor banner instead of hero/categories for vendor users */}
+   357→      {!isVendor && <HeroSection />}
+   358→
+   359→      {!isVendor && <CategoriesShowcase />}
+   360→
+   361→      {/* AI Event Planning CTA Section */}
+   362→      {!isVendor && (
+   363→        <section className="relative overflow-hidden border-y bg-gradient-to-r from-primary/8 via-amber-50/60 to-primary/5 dark:from-primary/5 dark:via-amber-950/20 dark:to-primary/5">
+   364→          <div className="absolute top-0 right-0 w-[300px] h-[300px] rounded-full bg-gradient-to-bl from-amber-200/20 to-transparent blur-3xl dark:from-amber-900/10" />
+   365→          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-12 sm:py-16 relative">
+   366→            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-8">
+   367→              <div className="max-w-xl">
+   368→                <motion.div
+   369→                  initial={{ opacity: 0, y: 20 }}
+   370→                  whileInView={{ opacity: 1, y: 0 }}
+   371→                  viewport={{ once: true }}
+   372→                  transition={{ duration: 0.5 }}
+   373→                >
+   374→                  <Badge variant="outline" className="mb-4 border-primary/30 text-primary gap-1.5">
+   375→                    <Sparkles className="h-3 w-3" />
+   376→                    AI-Powered
+   377→                  </Badge>
+   378→                  <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-foreground leading-tight">
+   379→                    Plan My Event{" "}
+   380→                    <span className="bg-gradient-to-r from-primary via-amber-600 to-orange-500 bg-clip-text text-transparent">
+   381→                      with AI
+   382→                    </span>
+   383→                  </h2>
+   384→                  <p className="mt-3 text-muted-foreground text-base sm:text-lg leading-relaxed">
+   385→                    Tell us about your event and our AI will build custom equipment packages from our marketplace inventory — with real products, real vendors, and real prices.
+   386→                  </p>
+   387→                </motion.div>
+   388→
+   389→                <motion.div
+   390→                  initial={{ opacity: 0, y: 20 }}
+   391→                  whileInView={{ opacity: 1, y: 0 }}
+   392→                  viewport={{ once: true }}
+   393→                  transition={{ duration: 0.5, delay: 0.1 }}
+   394→                  className="mt-6"
+   395→                >
+   396→                  <Button
+   397→                    size="lg"
+   398→                    className="gap-2 text-base px-6"
+   399→                    onClick={() => navigateTo("ai-event-planner")}
+   400→                  >
+   401→                    Start Planning
+   402→                    <ArrowRight className="h-4 w-4" />
+   403→                  </Button>
+   404→                </motion.div>
+   405→              </div>
+   406→
+   407→              <motion.div
+   408→                initial={{ opacity: 0, y: 20 }}
+   409→                whileInView={{ opacity: 1, y: 0 }}
+   410→                viewport={{ once: true }}
+   411→                transition={{ duration: 0.5, delay: 0.2 }}
+   412→                className="grid grid-cols-2 gap-4 lg:gap-5"
+   413→              >
+   414→                {[
+   415→                  { icon: Package, title: "3 Custom Packages", desc: "Economy, Standard & Premium tiers" },
+   416→                  { icon: ShieldCheck, title: "Real Inventory", desc: "Matched from marketplace products" },
+   417→                  { icon: Wallet, title: "Budget Optimized", desc: "Stay within your event budget" },
+   418→                  { icon: CalendarCheck, title: "One-Click Booking", desc: "Book entire package instantly" },
+   419→                ].map((feature, i) => (
+   420→                  <div
+   421→                    key={i}
+   422→                    className="flex items-start gap-3 p-4 rounded-xl bg-card/70 backdrop-blur-sm border border-border/50 hover:border-primary/30 transition-premium"
+   423→                  >
+   424→                    <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+   425→                      <feature.icon className="h-5 w-5 text-primary" />
+   426→                    </div>
+   427→                    <div>
+   428→                      <p className="text-sm font-semibold">{feature.title}</p>
+   429→                      <p className="text-xs text-muted-foreground mt-0.5">{feature.desc}</p>
+   430→                    </div>
+   431→                  </div>
+   432→                ))}
+   433→              </motion.div>
+   434→            </div>
+   435→          </div>
+   436→        </section>
+   437→      )}
+   438→
+   439→      {isVendor && (
+   440→        <div className="bg-primary/5 border-b">
+   441→          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-6">
+   442→            <div className="flex items-center gap-3">
+   443→              <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
+   444→                <Store className="h-5 w-5 text-primary" />
+   445→              </div>
+   446→              <div>
+   447→                <h2 className="text-lg font-semibold text-foreground">Showing your equipment</h2>
+   448→                <p className="text-sm text-muted-foreground">Manage and view all products you&apos;ve listed</p>
+   449→              </div>
+   450→            </div>
+   451→          </div>
+   452→        </div>
+   453→      )}
+   454→
+   455→      {/* 3. Marketplace Content */}
+   456→      <div id="marketplace-content" className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8 sm:py-10">
+   457→        {/* Section Header + AI Event Planner */}
+   458→        <div className="mb-6">
+   459→          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+   460→            <div>
+   461→              <h2 className="text-2xl sm:text-3xl font-bold text-foreground">
+   462→                {isVendor ? "My Equipment" : "All Equipment"}
+   463→              </h2>
+   464→              <p className="text-sm text-muted-foreground mt-1">
+   465→                {isVendor
+   466→                  ? "Manage and monitor your listed equipment"
+   467→                  : "Rent, buy, or book from verified vendors across India"}
+   468→              </p>
+   469→            </div>
+   470→            {!isVendor && (
+   471→              <Button
+   472→                onClick={() => navigateTo("ai-event-planner")}
+   473→                className="gap-2 rounded-full self-start sm:self-auto"
+   474→              >
+   475→                <Sparkles className="h-4 w-4" />
+   476→                AI Event Planner
+   477→              </Button>
+   478→            )}
+   479→          </div>
+   480→        </div>
+   481→
+   482→        {/* Search Bar */}
+   483→        <form onSubmit={handleSearchSubmit} className="mb-5">
+   484→          <div className="relative max-w-2xl mx-auto">
+   485→            <Search className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
+   486→            <Input
+   487→              placeholder="Search for equipment, tools, electronics..."
+   488→              value={searchQuery}
+   489→              onChange={(e) => setSearchQuery(e.target.value)}
+   490→              className="pl-12 pr-20 h-12 rounded-full bg-card border shadow-sm text-base"
+   491→            />
+   492→            <Button
+   493→              type="submit"
+   494→              size="sm"
+   495→              className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded-full"
+   496→            >
+   497→              Search
+   498→            </Button>
+   499→          </div>
+   500→        </form>
+   501→
+   502→        {/* Category Pills */}
+   503→        {!categoriesLoading && categories.length > 0 && (
+   504→          <div className="mb-6">
+   505→            <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-none">
+   506→              <button
+   507→                onClick={() => {
+   508→                  setSelectedCategory("ALL");
+   509→                  setPage(1);
+   510→                }}
+   511→                className="shrink-0"
+   512→              >
+   513→                <Badge
+   514→                  variant={selectedCategory === "ALL" ? "default" : "outline"}
+   515→                  className="rounded-full px-4 py-1.5 text-sm cursor-pointer transition-premium"
+   516→                >
+   517→                  All
+   518→                </Badge>
+   519→              </button>
+   520→              {categories.map((cat) => (
+   521→                <button
+   522→                  key={cat.id}
+   523→                  onClick={() => {
+   524→                    setSelectedCategory(cat.id);
+   525→                    setPage(1);
+   526→                  }}
+   527→                  className="shrink-0"
+   528→                >
+   529→                  <Badge
+   530→                    variant={selectedCategory === cat.id ? "default" : "outline"}
+   531→                    className="rounded-full px-4 py-1.5 text-sm cursor-pointer transition-premium"
+   532→                  >
+   533→                    {cat.icon && <span className="mr-1">{cat.icon}</span>}
+   534→                    {cat.name}
+   535→                    {cat._count?.products != null && (
+   536→                      <span className="ml-1.5 text-[10px] opacity-70">
+   537→                        {cat._count.products}
+   538→                      </span>
+   539→                    )}
+   540→                  </Badge>
+   541→                </button>
+   542→              ))}
+   543→            </div>
+   544→          </div>
+   545→        )}
+   546→
+   547→        {/* Mobile Filter Button */}
+   548→        <div className="flex items-center justify-between mb-4 lg:hidden">
+   549→          <p className="text-sm text-muted-foreground">
+   550→            {totalCount > 0
+   551→              ? `${totalCount} equipment found`
+   552→              : "No equipment found"}
+   553→          </p>
+   554→          <Sheet open={filterSheetOpen} onOpenChange={setFilterSheetOpen}>
+   555→            <SheetTrigger asChild>
+   556→              <Button variant="outline" size="sm" className="gap-2 rounded-full">
+   557→                <SlidersHorizontal className="h-4 w-4" />
+   558→                Filters
+   559→                {hasActiveFilters && (
+   560→                  <span className="h-2 w-2 rounded-full bg-primary" />
+   561→                )}
+   562→              </Button>
+   563→            </SheetTrigger>
+   564→            <SheetContent side="bottom" className="h-[80vh] rounded-t-2xl">
+   565→              <SheetHeader>
+   566→                <SheetTitle>Filters</SheetTitle>
+   567→              </SheetHeader>
+   568→              <div className="mt-4 overflow-y-auto max-h-[60vh]">
+   569→                <FiltersContent />
+   570→              </div>
+   571→            </SheetContent>
+   572→          </Sheet>
+   573→        </div>
+   574→
+   575→        {/* Main Layout */}
+   576→        <div className="flex gap-6">
+   577→          {/* Desktop Sidebar */}
+   578→          <aside className="hidden lg:block w-64 shrink-0">
+   579→            <div className="sticky top-20">
+   580→              <div className="flex items-center justify-between mb-4">
+   581→                <h3 className="text-sm font-semibold text-foreground">Filters</h3>
+   582→                {hasActiveFilters && (
+   583→                  <button
+   584→                    onClick={clearFilters}
+   585→                    className="text-xs text-muted-foreground hover:text-foreground transition-premium"
+   586→                  >
+   587→                    Clear all
+   588→                  </button>
+   589→                )}
+   590→              </div>
+   591→              <div className="rounded-xl border bg-card p-4">
+   592→                <FiltersContent />
+   593→              </div>
+   594→            </div>
+   595→          </aside>
+   596→
+   597→          {/* Product Grid */}
+   598→          <main className="flex-1 min-w-0">
+   599→            {/* Active filter tags */}
+   600→            {hasActiveFilters && (
+   601→              <div className="flex flex-wrap gap-2 mb-4">
+   602→                {activeSearch && (
+   603→                  <Badge variant="secondary" className="rounded-full gap-1">
+   604→                    &ldquo;{activeSearch}&rdquo;
+   605→                    <button onClick={() => { setSearchQuery(""); setActiveSearch(""); setPage(1); }}>
+   606→                      <X className="h-3 w-3 ml-1" />
+   607→                    </button>
+   608→                  </Badge>
+   609→                )}
+   610→                {selectedCategory !== "ALL" && (
+   611→                  <Badge variant="secondary" className="rounded-full gap-1">
+   612→                    {categories.find((c) => c.id === selectedCategory)?.name || "Category"}
+   613→                    <button onClick={() => { setSelectedCategory("ALL"); setPage(1); }}>
+   614→                      <X className="h-3 w-3 ml-1" />
+   615→                    </button>
+   616→                  </Badge>
+   617→                )}
+   618→                {bookingType !== "ALL" && (
+   619→                  <Badge variant="secondary" className="rounded-full gap-1">
+   620→                    {bookingType}
+   621→                    <button onClick={() => { setBookingType("ALL"); setPage(1); }}>
+   622→                      <X className="h-3 w-3 ml-1" />
+   623→                    </button>
+   624→                  </Badge>
+   625→                )}
+   626→                {condition !== "ALL" && (
+   627→                  <Badge variant="secondary" className="rounded-full gap-1">
+   628→                    {condition.replace("_", " ")}
+   629→                    <button onClick={() => { setCondition("ALL"); setPage(1); }}>
+   630→                      <X className="h-3 w-3 ml-1" />
+   631→                    </button>
+   632→                  </Badge>
+   633→                )}
+   634→              </div>
+   635→            )}
+   636→
+   637→            {/* Desktop result count */}
+   638→            <div className="hidden lg:flex items-center justify-between mb-4">
+   639→              <p className="text-sm text-muted-foreground">
+   640→                {loading ? "Loading..." : `${totalCount} equipment found`}
+   641→              </p>
+   642→            </div>
+   643→
+   644→            {/* Loading State */}
+   645→            {loading && (
+   646→              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4">
+   647→                {Array.from({ length: 8 }).map((_, i) => (
+   648→                  <ProductCardSkeleton key={i} />
+   649→                ))}
+   650→              </div>
+   651→            )}
+   652→
+   653→            {/* Empty State */}
+   654→            {!loading && products.length === 0 && (
+   655→              <motion.div
+   656→                initial={{ opacity: 0, y: 20 }}
+   657→                animate={{ opacity: 1, y: 0 }}
+   658→                className="flex flex-col items-center justify-center py-20 text-center"
+   659→              >
+   660→                <div className="h-20 w-20 rounded-full bg-muted flex items-center justify-center mb-4">
+   661→                  <PackageOpen className="h-10 w-10 text-muted-foreground" />
+   662→                </div>
+   663→                <h3 className="text-lg font-semibold text-foreground mb-1">
+   664→                  No equipment found
+   665→                </h3>
+   666→                <p className="text-sm text-muted-foreground mb-4 max-w-sm">
+   667→                  Try adjusting your search or filters to find what you&apos;re
+   668→                  looking for.
+   669→                </p>
+   670→                <Button variant="outline" className="rounded-full" onClick={clearFilters}>
+   671→                  Clear all filters
+   672→                </Button>
+   673→              </motion.div>
+   674→            )}
+   675→
+   676→            {/* Product Grid */}
+   677→            {!loading && products.length > 0 && (
+   678→              <motion.div
+   679→                initial={{ opacity: 0 }}
+   680→                animate={{ opacity: 1 }}
+   681→                className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4"
+   682→              >
+   683→                <AnimatePresence mode="popLayout">
+   684→                  {products.map((product) => (
+   685→                    <motion.div
+   686→                      key={product.id}
+   687→                      layout
+   688→                      initial={{ opacity: 0, y: 20 }}
+   689→                      animate={{ opacity: 1, y: 0 }}
+   690→                      exit={{ opacity: 0, scale: 0.95 }}
+   691→                      transition={{ duration: 0.2 }}
+   692→                    >
+   693→                      <ProductCard product={product} />
+   694→                    </motion.div>
+   695→                  ))}
+   696→                </AnimatePresence>
+   697→              </motion.div>
+   698→            )}
+   699→
+   700→            {/* Pagination */}
+   701→            {!loading && totalPages > 1 && (
+   702→              <div className="mt-8">
+   703→                <Pagination>
+   704→                  <PaginationContent>
+   705→                    <PaginationItem>
+   706→                      <PaginationPrevious
+   707→                        href="#"
+   708→                        onClick={(e) => {
+   709→                          e.preventDefault();
+   710→                          if (page > 1) setPage(page - 1);
+   711→                        }}
+   712→                        className={page <= 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
+   713→                      />
+   714→                    </PaginationItem>
+   715→
+   716→                    {Array.from({ length: totalPages }, (_, i) => i + 1)
+   717→                      .filter((p) => {
+   718→                        if (totalPages <= 7) return true;
+   719→                        if (p === 1 || p === totalPages) return true;
+   720→                        if (Math.abs(p - page) <= 1) return true;
+   721→                        return false;
+   722→                      })
+   723→                      .map((p, idx, arr) => {
+   724→                        const prev = arr[idx - 1];
+   725→                        const showEllipsis = prev != null && p - prev > 1;
+   726→                        return (
+   727→                          <span key={p} className="contents">
+   728→                            {showEllipsis && (
+   729→                              <PaginationItem>
+   730→                                <PaginationEllipsis />
+   731→                              </PaginationItem>
+   732→                            )}
+   733→                            <PaginationItem>
+   734→                              <PaginationLink
+   735→                                href="#"
+   736→                                isActive={p === page}
+   737→                                onClick={(e) => {
+   738→                                  e.preventDefault();
+   739→                                  setPage(p);
+   740→                                }}
+   741→                                className="cursor-pointer"
+   742→                              >
+   743→                                {p}
+   744→                              </PaginationLink>
+   745→                            </PaginationItem>
+   746→                          </span>
+   747→                        );
+   748→                      })}
+   749→
+   750→                    <PaginationItem>
+   751→                      <PaginationNext
+   752→                        href="#"
+   753→                        onClick={(e) => {
+   754→                          e.preventDefault();
+   755→                          if (page < totalPages) setPage(page + 1);
+   756→                        }}
+   757→                        className={page >= totalPages ? "pointer-events-none opacity-50" : "cursor-pointer"}
+   758→                      />
+   759→                    </PaginationItem>
+   760→                  </PaginationContent>
+   761→                </Pagination>
+   762→              </div>
+   763→            )}
+   764→          </main>
+   765→        </div>
+   766→      </div>
+   767→
+   768→      {/* 4. How It Works */}
+   769→      {!isVendor && <HowItWorks />}
+   770→
+   771→      {/* 5. Why RentWise */}
+   772→      {!isVendor && <WhyRentWise />}
+   773→
+   774→    </div>
+   775→  );
+   776→}
