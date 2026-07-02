@@ -466,7 +466,11 @@ interface ProductFormData {
   location: string;
 }
 
-function AddProductTab({ categories, onSubmitted, editingProduct }: {
+function AddProductTab({
+  categories,
+  onSubmitted,
+  editingProduct,
+}: {
   categories: Array<{ id: string; name: string }> | null;
   onSubmitted: () => void;
   editingProduct?: AppProduct | null;
@@ -490,9 +494,9 @@ function AddProductTab({ categories, onSubmitted, editingProduct }: {
 
   const title = watch("title");
 
-  // Pre-fill form when editing
   useEffect(() => {
     if (!editingProduct) return;
+
     reset({
       title: editingProduct.title,
       categoryId: editingProduct.categoryId,
@@ -505,28 +509,23 @@ function AddProductTab({ categories, onSubmitted, editingProduct }: {
       listingTypes: editingProduct.listingTypes || "RENT,BOOK",
       location: editingProduct.location || "",
     });
-    // Parse features
+
     try {
       const parsed = JSON.parse(editingProduct.features);
-      if (Array.isArray(parsed)) {
-        setValue("features", parsed.join(", "));
-      } else {
-        setValue("features", editingProduct.features);
-      }
+      setValue(
+        "features",
+        Array.isArray(parsed) ? parsed.join(", ") : editingProduct.features
+      );
     } catch {
       setValue("features", editingProduct.features);
     }
-    // Parse images
+
     if (editingProduct.images) {
       try {
         const parsed = JSON.parse(editingProduct.images);
-        if (Array.isArray(parsed)) {
-          setUploadedImages(parsed);
-        }
+        if (Array.isArray(parsed)) setUploadedImages(parsed);
       } catch {
-        if (editingProduct.imageUrl) {
-          setUploadedImages([editingProduct.imageUrl]);
-        }
+        if (editingProduct.imageUrl) setUploadedImages([editingProduct.imageUrl]);
       }
     } else if (editingProduct.imageUrl) {
       setUploadedImages([editingProduct.imageUrl]);
@@ -535,19 +534,34 @@ function AddProductTab({ categories, onSubmitted, editingProduct }: {
 
   const handleAIGenerate = async () => {
     if (!title?.trim() || !token) return;
+
     setAiLoading(true);
+
     try {
       const res = await fetch("/api/ai/description", {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
         body: JSON.stringify({ productName: title }),
       });
+
       if (!res.ok) throw new Error("AI generation failed");
+
       const data = await res.json();
+
+      if (data.title) setValue("title", data.title);
       if (data.description) setValue("description", data.description);
-      if (data.features) setValue("features", data.features);
-      if (data.categoryId) setValue("categoryId", data.categoryId);
-      toast.success("AI generated description successfully");
+
+      if (data.features) {
+        setValue(
+          "features",
+          Array.isArray(data.features) ? data.features.join(", ") : data.features
+        );
+      }
+
+      toast.success("AI generated your product content");
     } catch {
       toast.error("Failed to generate AI description");
     } finally {
@@ -555,11 +569,14 @@ function AddProductTab({ categories, onSubmitted, editingProduct }: {
     }
   };
 
-  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageUpload = async (
+    e: React.ChangeEvent<HTMLInputElement>
+  ) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
 
     const remaining = 6 - uploadedImages.length;
+
     if (remaining <= 0) {
       toast.error("Maximum 6 images allowed");
       return;
@@ -570,42 +587,48 @@ function AddProductTab({ categories, onSubmitted, editingProduct }: {
 
     try {
       const formData = new FormData();
-      filesToUpload.forEach((f) => formData.append("images", f));
+      filesToUpload.forEach((file) => formData.append("images", file));
 
       const res = await fetch("/api/upload", {
         method: "POST",
         body: formData,
       });
 
+      const data = await res.json();
+
       if (!res.ok) {
-        const data = await res.json();
         throw new Error(data.error || "Upload failed");
       }
 
-      const data = await res.json();
-      setUploadedImages((prev) => [...prev, ...data.urls]);
-      toast.success(`${data.urls.length} image${data.urls.length > 1 ? "s" : ""} uploaded`);
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : "Upload failed";
-      toast.error(message);
+      setUploadedImages((previous) => [...previous, ...data.urls]);
+
+      toast.success(
+        `${data.urls.length} image${data.urls.length > 1 ? "s" : ""} uploaded`
+      );
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : "Upload failed");
     } finally {
       setUploading(false);
-      // Reset the file input
       e.target.value = "";
     }
   };
 
   const removeImage = (index: number) => {
-    setUploadedImages((prev) => prev.filter((_, i) => i !== index));
+    setUploadedImages((previous) =>
+      previous.filter((_, imageIndex) => imageIndex !== index)
+    );
   };
 
   const onSubmit = async (formData: ProductFormData) => {
     if (!token) return;
+
     setSubmitting(true);
+
     try {
       const payload = {
         ...formData,
-        images: uploadedImages.length > 0 ? JSON.stringify(uploadedImages) : null,
+        images:
+          uploadedImages.length > 0 ? JSON.stringify(uploadedImages) : null,
         buyPrice: Number(formData.buyPrice),
         rentPricePerDay: Number(formData.rentPricePerDay),
         deposit: Number(formData.deposit),
@@ -617,15 +640,26 @@ function AddProductTab({ categories, onSubmitted, editingProduct }: {
       const url = isEditing
         ? `/api/vendors/products/${editingProduct.id}`
         : "/api/vendors/products";
-      const method = isEditing ? "PUT" : "POST";
 
       const res = await fetch(url, {
-        method,
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        method: isEditing ? "PUT" : "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
         body: JSON.stringify(payload),
       });
-      if (!res.ok) throw new Error(isEditing ? "Failed to update product" : "Failed to add product");
-      toast.success(isEditing ? "Product updated successfully!" : "Product added successfully!");
+
+      if (!res.ok) {
+        throw new Error(
+          isEditing ? "Failed to update product" : "Failed to add product"
+        );
+      }
+
+      toast.success(
+        isEditing ? "Product updated successfully!" : "Product added successfully!"
+      );
+
       reset();
       setValue("listingTypes", "RENT,BOOK");
       setUploadedImages([]);
@@ -638,295 +672,510 @@ function AddProductTab({ categories, onSubmitted, editingProduct }: {
   };
 
   return (
-    <motion.div {...tabAnimation} className="max-w-2xl">
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">{isEditing ? "Edit Product" : "Add New Product"}</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-            {/* Title + AI */}
-            <div className="space-y-2">
-              <Label htmlFor="title">Product Title</Label>
-              <div className="flex gap-2">
-                <Input
-                  id="title"
-                  placeholder="e.g. Canon EOS R5 Camera"
-                  {...register("title", { required: "Title is required" })}
-                  className="flex-1"
-                />
+    <motion.div {...tabAnimation} className="w-full">
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
+        <Card className="w-full border-border/70 shadow-sm">
+          <CardHeader className="border-b bg-muted/20 px-5 py-5 sm:px-7">
+            <CardTitle className="text-xl">
+              {isEditing ? "Edit Product Listing" : "Create a Product Listing"}
+            </CardTitle>
+            <p className="text-sm text-muted-foreground">
+              Add accurate details so customers can confidently rent, book, or buy.
+            </p>
+          </CardHeader>
+
+          <CardContent className="p-5 sm:p-7">
+            <form onSubmit={handleSubmit(onSubmit)} className="space-y-7">
+              <section className="space-y-5">
+                <div className="flex items-center gap-2">
+                  <div className="flex h-7 w-7 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground">
+                    1
+                  </div>
+                  <div>
+                    <h3 className="font-semibold">Product details</h3>
+                    <p className="text-xs text-muted-foreground">
+                      Tell customers what you are listing.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="title">Product Title</Label>
+
+                  <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto]">
+                    <Input
+                      id="title"
+                      placeholder="e.g. Canon EOS R5 Camera"
+                      {...register("title", { required: "Title is required" })}
+                      className="h-11"
+                    />
+
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={handleAIGenerate}
+                      disabled={aiLoading || !title?.trim()}
+                      className="h-11 border-primary/30 bg-primary/5 px-4 text-primary hover:bg-primary/10"
+                    >
+                      {aiLoading ? (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      ) : (
+                        <Sparkles className="mr-2 h-4 w-4" />
+                      )}
+                      Generate with AI
+                    </Button>
+                  </div>
+
+                  {errors.title && (
+                    <p className="text-xs text-destructive">{errors.title.message}</p>
+                  )}
+                </div>
+
+                <div className="grid gap-5 md:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label>Category</Label>
+                    <Select
+                      value={watch("categoryId") || ""}
+                      onValueChange={(value) => setValue("categoryId", value)}
+                    >
+                      <SelectTrigger className="h-11 w-full">
+                        <SelectValue placeholder="Select a category" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {categories?.map((category) => (
+                          <SelectItem key={category.id} value={category.id}>
+                            {category.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+
+                    <input
+                      type="hidden"
+                      {...register("categoryId", {
+                        required: "Category is required",
+                      })}
+                    />
+
+                    {errors.categoryId && (
+                      <p className="text-xs text-destructive">
+                        {errors.categoryId.message}
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Condition</Label>
+                    <Select
+                      value={watch("condition") || ""}
+                      onValueChange={(value) => setValue("condition", value)}
+                    >
+                      <SelectTrigger className="h-11 w-full">
+                        <SelectValue placeholder="Select condition" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="NEW">New</SelectItem>
+                        <SelectItem value="LIKE_NEW">Like New</SelectItem>
+                        <SelectItem value="GOOD">Good</SelectItem>
+                        <SelectItem value="FAIR">Fair</SelectItem>
+                      </SelectContent>
+                    </Select>
+
+                    <input
+                      type="hidden"
+                      {...register("condition", {
+                        required: "Condition is required",
+                      })}
+                    />
+
+                    {errors.condition && (
+                      <p className="text-xs text-destructive">
+                        {errors.condition.message}
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="description">Description</Label>
+                  <Textarea
+                    id="description"
+                    placeholder="Describe the product, included accessories, technical details, and ideal use cases..."
+                    rows={6}
+                    {...register("description", {
+                      required: "Description is required",
+                    })}
+                    className="resize-y"
+                  />
+
+                  {errors.description && (
+                    <p className="text-xs text-destructive">
+                      {errors.description.message}
+                    </p>
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="features">Key Features</Label>
+                  <Input
+                    id="features"
+                    placeholder="e.g. 4K video, 45MP sensor, Wi-Fi, Bluetooth"
+                    {...register("features")}
+                    className="h-11"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Separate features with commas.
+                  </p>
+                </div>
+              </section>
+
+              <Separator />
+
+              <section className="space-y-5">
+                <div className="flex items-center gap-2">
+                  <div className="flex h-7 w-7 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground">
+                    2
+                  </div>
+                  <div>
+                    <h3 className="font-semibold">Pricing and availability</h3>
+                    <p className="text-xs text-muted-foreground">
+                      Set prices, stock, and listing options.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="grid gap-4 sm:grid-cols-3">
+                  <div className="space-y-2">
+                    <Label htmlFor="buyPrice">Buy Price (₹)</Label>
+                    <Input
+                      id="buyPrice"
+                      type="number"
+                      min="0"
+                      placeholder="0"
+                      {...register("buyPrice", { required: "Required" })}
+                      className="h-11"
+                    />
+                    {errors.buyPrice && (
+                      <p className="text-xs text-destructive">
+                        {errors.buyPrice.message}
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="rentPricePerDay">Rent / Day (₹)</Label>
+                    <Input
+                      id="rentPricePerDay"
+                      type="number"
+                      min="0"
+                      placeholder="0"
+                      {...register("rentPricePerDay", { required: "Required" })}
+                      className="h-11"
+                    />
+                    {errors.rentPricePerDay && (
+                      <p className="text-xs text-destructive">
+                        {errors.rentPricePerDay.message}
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="deposit">Security Deposit (₹)</Label>
+                    <Input
+                      id="deposit"
+                      type="number"
+                      min="0"
+                      placeholder="0"
+                      {...register("deposit", { required: "Required" })}
+                      className="h-11"
+                    />
+                    {errors.deposit && (
+                      <p className="text-xs text-destructive">
+                        {errors.deposit.message}
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                <div className="grid gap-5 md:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="stock">Stock Quantity</Label>
+                    <Input
+                      id="stock"
+                      type="number"
+                      min="1"
+                      placeholder="1"
+                      {...register("stock", {
+                        required: "Required",
+                        valueAsNumber: true,
+                      })}
+                      className="h-11"
+                    />
+                    {errors.stock && (
+                      <p className="text-xs text-destructive">{errors.stock.message}</p>
+                    )}
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="location">Location / City</Label>
+                    <Input
+                      id="location"
+                      placeholder="e.g. Pune, Mumbai, Bengaluru"
+                      {...register("location")}
+                      className="h-11"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Where can customers collect or receive this equipment?
+                    </p>
+                  </div>
+                </div>
+
+                <div className="space-y-3">
+                  <Label>Available For</Label>
+
+                  <div className="grid gap-3 sm:grid-cols-3">
+                    {[
+                      {
+                        value: "RENT",
+                        label: "Rent",
+                        icon: "🔄",
+                        desc: "Daily or weekly rental",
+                      },
+                      {
+                        value: "BUY",
+                        label: "Sell",
+                        icon: "💰",
+                        desc: "One-time purchase",
+                      },
+                      {
+                        value: "BOOK",
+                        label: "Book",
+                        icon: "📅",
+                        desc: "Date-based booking",
+                      },
+                    ].map((type) => {
+                      const selected = (watch("listingTypes") || "")
+                        .split(",")
+                        .includes(type.value);
+
+                      return (
+                        <label
+                          key={type.value}
+                          className={`cursor-pointer rounded-xl border p-4 text-center transition ${
+                            selected
+                              ? "border-primary bg-primary/5"
+                              : "hover:border-primary/40 hover:bg-muted/40"
+                          }`}
+                        >
+                          <input
+                            type="checkbox"
+                            value={type.value}
+                            className="sr-only"
+                            checked={selected}
+                            onChange={(event) => {
+                              const current = watch("listingTypes") || "";
+                              const types = current
+                                ? current.split(",").filter(Boolean)
+                                : [];
+
+                              const nextTypes = event.target.checked
+                                ? [...new Set([...types, type.value])]
+                                : types.filter((item) => item !== type.value);
+
+                              setValue("listingTypes", nextTypes.join(","));
+                            }}
+                          />
+
+                          <span className="block text-xl">{type.icon}</span>
+                          <span className="mt-1 block text-sm font-semibold">
+                            {type.label}
+                          </span>
+                          <span className="mt-1 block text-[11px] text-muted-foreground">
+                            {type.desc}
+                          </span>
+                        </label>
+                      );
+                    })}
+                  </div>
+
+                  <input type="hidden" {...register("listingTypes")} />
+                </div>
+              </section>
+
+              <Separator />
+
+              <section className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="font-semibold">Product Images</h3>
+                    <p className="text-xs text-muted-foreground">
+                      Add up to six images. The first image is the main image.
+                    </p>
+                  </div>
+                  <span className="rounded-full bg-muted px-2.5 py-1 text-xs text-muted-foreground">
+                    {uploadedImages.length}/6
+                  </span>
+                </div>
+
+                {uploadedImages.length < 6 && (
+                  <label
+                    className={`flex h-36 w-full cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed transition ${
+                      uploading
+                        ? "border-primary/50 bg-primary/5 opacity-70"
+                        : "border-muted-foreground/25 hover:border-primary/50 hover:bg-primary/5"
+                    }`}
+                  >
+                    <input
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp,image/gif,image/svg+xml"
+                      multiple
+                      className="hidden"
+                      onChange={handleImageUpload}
+                      disabled={uploading}
+                    />
+
+                    {uploading ? (
+                      <>
+                        <Loader2 className="h-7 w-7 animate-spin text-primary" />
+                        <p className="text-sm font-medium">Uploading images...</p>
+                      </>
+                    ) : (
+                      <>
+                        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-muted">
+                          <ImageIcon className="h-5 w-5 text-muted-foreground" />
+                        </div>
+                        <div className="text-center">
+                          <p className="text-sm font-medium">Click to upload product images</p>
+                          <p className="mt-1 text-xs text-muted-foreground">
+                            JPG, PNG, WebP, GIF · Maximum 5MB per image
+                          </p>
+                        </div>
+                      </>
+                    )}
+                  </label>
+                )}
+
+                {uploadedImages.length > 0 && (
+                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+                    {uploadedImages.map((url, index) => (
+                      <div
+                        key={`${url}-${index}`}
+                        className="group relative aspect-square overflow-hidden rounded-xl border bg-muted"
+                      >
+                        <img
+                          src={url}
+                          alt={`Product upload ${index + 1}`}
+                          className="h-full w-full object-cover"
+                        />
+
+                        <button
+                          type="button"
+                          onClick={() => removeImage(index)}
+                          className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-black/65 text-white opacity-100 transition hover:bg-black sm:opacity-0 sm:group-hover:opacity-100"
+                          aria-label={`Remove image ${index + 1}`}
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
+
+                        {index === 0 && (
+                          <span className="absolute bottom-0 left-0 right-0 bg-black/65 py-1 text-center text-[10px] font-medium text-white">
+                            Main image
+                          </span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </section>
+
+              <div className="flex flex-col-reverse gap-3 border-t pt-6 sm:flex-row sm:justify-end">
                 <Button
                   type="button"
                   variant="outline"
-                  size="sm"
-                  onClick={handleAIGenerate}
-                  disabled={aiLoading || !title?.trim()}
-                  className="shrink-0"
+                  onClick={() => {
+                    reset();
+                    setUploadedImages([]);
+                    setValue("listingTypes", "RENT,BOOK");
+                  }}
+                  disabled={submitting}
+                  className="h-11"
                 >
-                  {aiLoading ? (
-                    <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
-                  ) : (
-                    <Sparkles className="h-4 w-4 mr-1.5" />
-                  )}
-                  Generate with AI
+                  Clear Form
                 </Button>
-              </div>
-              {errors.title && <p className="text-xs text-destructive">{errors.title.message}</p>}
-            </div>
 
-            {/* Category */}
-            <div className="space-y-2">
-              <Label>Category</Label>
-              <Select onValueChange={(v) => setValue("categoryId", v)} defaultValue="">
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Select a category" />
-                </SelectTrigger>
-                <SelectContent>
-                  {categories?.map((c) => (
-                    <SelectItem key={c.id} value={c.id}>
-                      {c.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <input type="hidden" {...register("categoryId", { required: "Category is required" })} />
-              {errors.categoryId && <p className="text-xs text-destructive">{errors.categoryId.message}</p>}
-            </div>
-
-            {/* Description */}
-            <div className="space-y-2">
-              <Label htmlFor="description">Description</Label>
-              <Textarea
-                id="description"
-                placeholder="Describe the product..."
-                rows={4}
-                {...register("description", { required: "Description is required" })}
-              />
-              {errors.description && <p className="text-xs text-destructive">{errors.description.message}</p>}
-            </div>
-
-            {/* Features */}
-            <div className="space-y-2">
-              <Label htmlFor="features">Features</Label>
-              <Input
-                id="features"
-                placeholder="e.g. 4K Video, 45MP, WiFi, Bluetooth (comma separated)"
-                {...register("features")}
-              />
-              <p className="text-xs text-muted-foreground">Separate features with commas</p>
-            </div>
-
-            {/* Prices Row */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="buyPrice">Buy Price (₹)</Label>
-                <Input
-                  id="buyPrice"
-                  type="number"
-                  placeholder="0"
-                  {...register("buyPrice", { required: "Required" })}
-                />
-                {errors.buyPrice && <p className="text-xs text-destructive">{errors.buyPrice.message}</p>}
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="rentPricePerDay">Rent Price / Day (₹)</Label>
-                <Input
-                  id="rentPricePerDay"
-                  type="number"
-                  placeholder="0"
-                  {...register("rentPricePerDay", { required: "Required" })}
-                />
-                {errors.rentPricePerDay && <p className="text-xs text-destructive">{errors.rentPricePerDay.message}</p>}
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="deposit">Deposit (₹)</Label>
-                <Input
-                  id="deposit"
-                  type="number"
-                  placeholder="0"
-                  {...register("deposit", { required: "Required" })}
-                />
-                {errors.deposit && <p className="text-xs text-destructive">{errors.deposit.message}</p>}
-              </div>
-            </div>
-
-            {/* Stock + Condition */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="stock">Stock Quantity</Label>
-                <Input
-                  id="stock"
-                  type="number"
-                  placeholder="1"
-                  {...register("stock", { required: "Required", valueAsNumber: true })}
-                />
-                {errors.stock && <p className="text-xs text-destructive">{errors.stock.message}</p>}
-              </div>
-              <div className="space-y-2">
-                <Label>Condition</Label>
-                <Select onValueChange={(v) => setValue("condition", v)} defaultValue="">
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Select condition" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="NEW">New</SelectItem>
-                    <SelectItem value="LIKE_NEW">Like New</SelectItem>
-                    <SelectItem value="GOOD">Good</SelectItem>
-                    <SelectItem value="FAIR">Fair</SelectItem>
-                  </SelectContent>
-                </Select>
-                <input type="hidden" {...register("condition", { required: "Condition is required" })} />
-                {errors.condition && <p className="text-xs text-destructive">{errors.condition.message}</p>}
-              </div>
-            </div>
-
-            {/* Image Upload */}
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <Label>Product Images</Label>
-                <span className="text-xs text-muted-foreground">
-                  {uploadedImages.length}/6
-                </span>
-              </div>
-
-              {/* Upload Area */}
-              {uploadedImages.length < 6 && (
-                <label
-                  className={`flex flex-col items-center justify-center gap-2 w-full h-32 rounded-xl border-2 border-dashed cursor-pointer transition-colors ${
-                    uploading
-                      ? "border-primary/50 bg-primary/5 opacity-60"
-                      : "border-muted-foreground/25 hover:border-primary/50 hover:bg-primary/5"
-                  }`}
-                >
-                  <input
-                    type="file"
-                    accept="image/jpeg,image/png,image/webp,image/gif,image/svg+xml"
-                    multiple
-                    className="hidden"
-                    onChange={handleImageUpload}
-                    disabled={uploading}
-                  />
-                  {uploading ? (
-                    <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                <Button type="submit" disabled={submitting} className="h-11 min-w-44">
+                  {submitting ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      {isEditing ? "Saving..." : "Publishing..."}
+                    </>
                   ) : (
                     <>
-                      <div className="h-10 w-10 rounded-full bg-muted flex items-center justify-center">
-                        <ImageIcon className="h-5 w-5 text-muted-foreground" />
-                      </div>
-                      <div className="text-center">
-                        <p className="text-sm font-medium text-foreground">
-                          Tap to upload images
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          JPG, PNG, WebP, GIF — Max 5MB each
-                        </p>
-                      </div>
+                      {isEditing ? (
+                        <Pencil className="mr-2 h-4 w-4" />
+                      ) : (
+                        <Plus className="mr-2 h-4 w-4" />
+                      )}
+                      {isEditing ? "Save Changes" : "Publish Product"}
                     </>
                   )}
-                </label>
-              )}
-
-              {/* Image Previews */}
-              {uploadedImages.length > 0 && (
-                <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
-                  {uploadedImages.map((url, idx) => (
-                    <div
-                      key={idx}
-                      className="relative aspect-square rounded-lg overflow-hidden border bg-muted group"
-                    >
-                      <img
-                        src={url}
-                        alt={`Upload ${idx + 1}`}
-                        className="h-full w-full object-cover"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => removeImage(idx)}
-                        className="absolute top-1 right-1 h-5 w-5 rounded-full bg-black/60 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-                      >
-                        <X className="h-3 w-3" />
-                      </button>
-                      {idx === 0 && (
-                        <span className="absolute bottom-0 left-0 right-0 bg-black/60 text-white text-[9px] text-center py-0.5">
-                          Main
-                        </span>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* Listing Types */}
-            <div className="space-y-2">
-              <Label>Available For</Label>
-              <div className="grid grid-cols-3 gap-3">
-                {[
-                  { value: "RENT", label: "Rent", icon: "🔄", desc: "Daily/weekly rental" },
-                  { value: "BUY", label: "Sell", icon: "💰", desc: "One-time purchase" },
-                  { value: "BOOK", label: "Book", icon: "📅", desc: "Date-based booking" },
-                ].map((type) => (
-                  <label
-                    key={type.value}
-                    className="flex flex-col items-center gap-1.5 p-3 rounded-lg border cursor-pointer has-[:checked]:border-primary has-[:checked]:bg-primary/5 transition-colors"
-                  >
-                    <input
-                      type="checkbox"
-                      value={type.value}
-                      className="sr-only"
-                      onChange={(e) => {
-                        const current = watch("listingTypes") || "";
-                        const types = current ? current.split(",") : [];
-                        if (e.target.checked) {
-                          if (!types.includes(type.value)) types.push(type.value);
-                        } else {
-                          const idx = types.indexOf(type.value);
-                          if (idx > -1) types.splice(idx, 1);
-                        }
-                        setValue("listingTypes", types.join(","));
-                      }}
-                      defaultChecked={["RENT", "BOOK"].includes(type.value)}
-                    />
-                    <span className="text-lg">{type.icon}</span>
-                    <span className="text-xs font-medium">{type.label}</span>
-                    <span className="text-[10px] text-muted-foreground text-center">{type.desc}</span>
-                  </label>
-                ))}
+                </Button>
               </div>
-              <input type="hidden" {...register("listingTypes")} />
-            </div>
+            </form>
+          </CardContent>
+        </Card>
 
-            {/* Location */}
-            <div className="space-y-2">
-              <Label htmlFor="location">Location / City</Label>
-              <Input
-                id="location"
-                placeholder="e.g. Bengaluru, Mumbai, Delhi"
-                {...register("location")}
-              />
-              <p className="text-xs text-muted-foreground">Where is this equipment available?</p>
-            </div>
+        <aside className="space-y-5 xl:sticky xl:top-6 xl:self-start">
+          <Card className="border-border/70 shadow-sm">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base">Listing checklist</CardTitle>
+            </CardHeader>
 
-            <Button type="submit" className="w-full" disabled={submitting}>
-              {submitting ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  {isEditing ? "Saving Changes..." : "Adding Product..."}
-                </>
-              ) : (
-                <>
-                  {isEditing ? (
-                    <Pencil className="h-4 w-4 mr-2" />
-                  ) : (
-                    <Plus className="h-4 w-4 mr-2" />
-                  )}
-                  {isEditing ? "Save Changes" : "Add Product"}
-                </>
-              )}
-            </Button>
-          </form>
-        </CardContent>
-      </Card>
+            <CardContent className="space-y-4 text-sm">
+              <div className="flex gap-3">
+                <CheckCircle className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />
+                <p>Add a clear, specific product title.</p>
+              </div>
+              <div className="flex gap-3">
+                <CheckCircle className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />
+                <p>Choose the correct category and condition.</p>
+              </div>
+              <div className="flex gap-3">
+                <CheckCircle className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />
+                <p>Set realistic rent price and refundable deposit.</p>
+              </div>
+              <div className="flex gap-3">
+                <CheckCircle className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />
+                <p>Upload multiple clear photos from different angles.</p>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="border-primary/20 bg-primary/5 shadow-sm">
+            <CardContent className="p-5">
+              <div className="flex gap-3">
+                <Sparkles className="h-5 w-5 shrink-0 text-primary" />
+                <div>
+                  <h3 className="font-semibold">Use AI to save time</h3>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    Enter a product title and click Generate with AI. It can create a
+                    polished description and feature list for you.
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="border-amber-200 bg-amber-50/70 shadow-sm dark:border-amber-900/60 dark:bg-amber-950/20">
+            <CardContent className="flex gap-3 p-5">
+              <AlertCircle className="h-5 w-5 shrink-0 text-amber-600" />
+              <p className="text-sm text-amber-900 dark:text-amber-200">
+                Make sure your pricing and stock details are correct before publishing.
+              </p>
+            </CardContent>
+          </Card>
+        </aside>
+      </div>
     </motion.div>
   );
 }
