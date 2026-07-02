@@ -43,7 +43,7 @@ export async function POST(req: NextRequest) {
 ${category ? `Category: ${category}` : ""}`;
 
     const completion = await zenmux.chat.completions.create({
-      model: "google/gemini-2.5-flash",
+      model: "anthropic/claude-sonnet-5-free",
       messages: [
         { role: "system", content: SYSTEM_PROMPT },
         { role: "user", content: userMessage },
