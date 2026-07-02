@@ -32,7 +32,8 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
+} 
+from "@/components/ui/select";
 import {
   Table,
   TableBody,
@@ -40,13 +41,15 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table";
+} 
+from "@/components/ui/table";
 import {
   Tabs,
   TabsContent,
   TabsList,
   TabsTrigger,
-} from "@/components/ui/tabs";
+} 
+from "@/components/ui/tabs";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -56,7 +59,8 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+} 
+from "@/components/ui/alert-dialog";
 import { useAppStore } from "@/stores/app-store";
 import type {
   AppBooking,

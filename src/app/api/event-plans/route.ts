@@ -1,41 +1,92 @@
 import { NextRequest, NextResponse } from "next/server";
-import { db } from "@/lib/db";
-import { verifyToken, getTokenFromHeader } from "@/lib/auth";
+import { GoogleGenAI } from "@google/genai";
 
-export async function GET(req: NextRequest) {
+const SYSTEM_PROMPT = `You are RentWise AI Event Planner.
+
+Given an event description, create a practical equipment recommendation plan for an equipment rental marketplace.
+
+Return ONLY valid JSON in exactly this format:
+{
+  "eventTitle": "Short event title",
+  "summary": "Short summary of the event requirements",
+  "recommendedItems": [
+    {
+      "name": "Equipment name",
+      "quantity": 1,
+      "reason": "Why this equipment is needed"
+    }
+  ],
+  "tips": [
+    "Helpful planning tip 1",
+    "Helpful planning tip 2",
+    "Helpful planning tip 3"
+  ]
+}
+
+Recommend suitable items such as speakers, microphones, LED screens, projectors, cameras, lights, chairs, tables, decoration equipment, generators, and staging equipment.`;
+
+export async function POST(req: NextRequest) {
   try {
-    // Authenticate user
-    const token = getTokenFromHeader(req);
-    if (!token) {
-      return NextResponse.json({ error: "Authentication required" }, { status: 401 });
+    const body = await req.json();
+
+    const eventDescription =
+      body.eventDescription ||
+      body.description ||
+      body.event ||
+      "";
+
+    if (!eventDescription.trim()) {
+      return NextResponse.json(
+        { error: "Event description is required" },
+        { status: 400 }
+      );
     }
 
-    const payload = await verifyToken(token);
-    if (!payload) {
-      return NextResponse.json({ error: "Invalid or expired token" }, { status: 401 });
+    const apiKey = process.env.GEMINI_API_KEY;
+
+    if (!apiKey) {
+      return NextResponse.json(
+        { error: "GEMINI_API_KEY is missing in Vercel environment variables" },
+        { status: 500 }
+      );
     }
 
-    // Fetch user's event plans with booking counts
-    const plans = await db.eventPlan.findMany({
-      where: { userId: payload.userId },
-      orderBy: { createdAt: "desc" },
-      select: {
-        id: true,
-        eventType: true,
-        guests: true,
-        budget: true,
-        status: true,
-        selectedTier: true,
-        createdAt: true,
-        _count: {
-          select: { packageBookings: true },
-        },
+    const ai = new GoogleGenAI({ apiKey });
+
+    const response = await ai.models.generateContent({
+      model: "gemini-2.5-flash",
+      contents: `${SYSTEM_PROMPT}
+
+Event description:
+"${eventDescription}"`,
+      config: {
+        responseMimeType: "application/json",
       },
     });
 
-    return NextResponse.json(plans);
+    const raw = response.text || "";
+
+    try {
+      return NextResponse.json(JSON.parse(raw));
+    } catch {
+      console.error("Gemini returned invalid JSON:", raw);
+
+      return NextResponse.json(
+        { error: "Gemini returned invalid event plan data" },
+        { status: 500 }
+      );
+    }
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : "Failed to fetch event plans";
-    return NextResponse.json({ error: message }, { status: 500 });
+    console.error("Gemini Event Planner error:", error);
+
+    return NextResponse.json(
+      {
+        error:
+          error instanceof Error
+            ? error.message
+            : "Failed to generate event plan",
+      },
+      { status: 500 }
+    );
   }
 }
