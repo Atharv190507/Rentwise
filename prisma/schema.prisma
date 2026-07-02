@@ -3,8 +3,8 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
   directUrl = env("DIRECT_URL")
 }
 
@@ -19,23 +19,23 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  vendor         Vendor?
-  bookings       Booking[]
-  reviews        Review[]
+  vendor            Vendor?
+  bookings          Booking[]
+  reviews           Review[]
   aiRecommendations AIRecommendation[]
-  eventPlans       EventPlan[]
+  eventPlans        EventPlan[]
 }
 
 model Vendor {
-  id           String @id @default(cuid())
-  userId       String @unique
+  id           String   @id @default(cuid())
+  userId       String   @unique
   businessName String
   address      String?
   phone        String?
   description  String?
-  isVerified   Boolean @default(false)
-  isSuspended  Boolean @default(false)
-  rating       Float   @default(0)
+  isVerified   Boolean  @default(false)
+  isSuspended  Boolean  @default(false)
+  rating       Float    @default(0)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
@@ -55,78 +55,78 @@ model Category {
 }
 
 model Product {
-  id             String   @id @default(cuid())
-  vendorId       String
-  categoryId     String
-  title          String
-  slug           String
-  description    String
-  features       String   // JSON array string
-  buyPrice       Float
+  id              String   @id @default(cuid())
+  vendorId        String
+  categoryId      String
+  title           String
+  slug            String
+  description     String
+  features        String // JSON array string
+  buyPrice        Float
   rentPricePerDay Float
-  deposit        Float    @default(0)
-  stock          Int      @default(1)
-  status         String   @default("AVAILABLE") // AVAILABLE, UNAVAILABLE
-  imageUrl       String?
-  images         String?  // JSON array of image paths, e.g. ["/uploads/products/abc.jpg"]
-  condition      String   @default("NEW") // NEW, LIKE_NEW, GOOD, FAIR
-  listingTypes   String   @default("RENT,BOOK")
-  location       String?
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  deposit         Float    @default(0)
+  stock           Int      @default(1)
+  status          String   @default("AVAILABLE") // AVAILABLE, UNAVAILABLE
+  imageUrl        String?
+  images          String? // JSON array of image paths, e.g. ["/uploads/products/abc.jpg"]
+  condition       String   @default("NEW") // NEW, LIKE_NEW, GOOD, FAIR
+  listingTypes    String   @default("RENT,BOOK")
+  location        String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
-  vendor     Vendor       @relation(fields: [vendorId], references: [id])
-  category   Category     @relation(fields: [categoryId], references: [id])
-  bookings   Booking[]
-  reviews    Review[]
+  vendor   Vendor    @relation(fields: [vendorId], references: [id])
+  category Category  @relation(fields: [categoryId], references: [id])
+  bookings Booking[]
+  reviews  Review[]
 }
 
 model Booking {
-  id            String   @id @default(cuid())
+  id            String    @id @default(cuid())
   userId        String
   productId     String
-  bookingType   String   // RENT, BUY, BOOK
+  bookingType   String // RENT, BUY, BOOK
   startDate     DateTime?
   endDate       DateTime?
-  quantity      Int      @default(1)
+  quantity      Int       @default(1)
   totalPrice    Float
-  depositAmount Float    @default(0)
-  status        String   @default("PENDING") // PENDING, APPROVED, CONFIRMED, DELIVERED, RETURNED, COMPLETED, CANCELLED, REJECTED
+  depositAmount Float     @default(0)
+  status        String    @default("PENDING") // PENDING, APPROVED, CONFIRMED, DELIVERED, RETURNED, COMPLETED, CANCELLED, REJECTED
   notes         String?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 
-  user        User       @relation(fields: [userId], references: [id])
-  product     Product    @relation(fields: [productId], references: [id])
-  payment     Payment?
-  return_      Return?
-  review      Review?
+  user              User               @relation(fields: [userId], references: [id])
+  product           Product            @relation(fields: [productId], references: [id])
+  payment           Payment?
+  return_           Return?
+  review            Review?
   aiRecommendations AIRecommendation[]
-  packageBookings  PackageBooking[]
+  packageBookings   PackageBooking[]
 }
 
 model Payment {
-  id            String   @id @default(cuid())
-  bookingId     String   @unique
-  paymentStatus String   @default("PENDING") // PENDING, COMPLETED, FAILED, REFUNDED
-  paymentMethod String   @default("ONLINE") // ONLINE, CASH, UPI, CARD
+  id            String    @id @default(cuid())
+  bookingId     String    @unique
+  paymentStatus String    @default("PENDING") // PENDING, COMPLETED, FAILED, REFUNDED
+  paymentMethod String    @default("ONLINE") // ONLINE, CASH, UPI, CARD
   amount        Float
   paidAt        DateTime?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 
   booking Booking @relation(fields: [bookingId], references: [id])
 }
 
 model Return {
-  id           String   @id @default(cuid())
-  bookingId    String   @unique
+  id           String    @id @default(cuid())
+  bookingId    String    @unique
   returnDate   DateTime?
-  returnStatus String   @default("PENDING") // PENDING, INSPECTING, COMPLETED, DAMAGE_REPORTED
+  returnStatus String    @default("PENDING") // PENDING, INSPECTING, COMPLETED, DAMAGE_REPORTED
   damageNotes  String?
-  fineAmount   Float    @default(0)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  fineAmount   Float     @default(0)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
 
   booking Booking @relation(fields: [bookingId], references: [id])
 }
@@ -136,13 +136,13 @@ model Review {
   userId    String
   productId String
   bookingId String?  @unique
-  rating    Int      // 1-5
+  rating    Int // 1-5
   comment   String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  user    User    @relation(fields: [userId], references: [id])
-  product Product @relation(fields: [productId], references: [id])
+  user    User     @relation(fields: [userId], references: [id])
+  product Product  @relation(fields: [productId], references: [id])
   booking Booking? @relation(fields: [bookingId], references: [id])
 }
 
@@ -154,68 +154,68 @@ model AIRecommendation {
   recommendation String
   explanation    String
   savings        Float?
-  alternatives   String?  // JSON array string
+  alternatives   String? // JSON array string
   createdAt      DateTime @default(now())
 
-  user     User?    @relation(fields: [userId], references: [id])
-  booking  Booking? @relation(fields: [bookingId], references: [id])
+  user    User?    @relation(fields: [userId], references: [id])
+  booking Booking? @relation(fields: [bookingId], references: [id])
 }
 
 model EventPlan {
-  id              String   @id @default(cuid())
-  userId          String
-  eventType       String   // Wedding, Concert, Corporate, Birthday, Conference, etc.
-  guests          Int
-  venueType       String   // Indoor, Outdoor, Both
-  budget          Float
-  city            String?
-  duration        Int      @default(1) // days
-  eventDate       DateTime?
-  requirements    String?  // additional requirements text
-  preference      String   @default("RENT") // RENT, BUY, BOTH
-  quality         String   @default("STANDARD") // BASIC, STANDARD, PREMIUM
-  aiPrompt        String?  // the full prompt sent to AI
-  aiResponse      String?  // raw AI response
-  packages        String   // JSON: the 3 package options (economy, standard, premium)
-  selectedTier    String?  // ECONOMY, STANDARD, PREMIUM
-  status          String   @default("DRAFT") // DRAFT, BOOKED, CANCELLED
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  id           String    @id @default(cuid())
+  userId       String
+  eventType    String // Wedding, Concert, Corporate, Birthday, Conference, etc.
+  guests       Int
+  venueType    String // Indoor, Outdoor, Both
+  budget       Float
+  city         String?
+  duration     Int       @default(1) // days
+  eventDate    DateTime?
+  requirements String? // additional requirements text
+  preference   String    @default("RENT") // RENT, BUY, BOTH
+  quality      String    @default("STANDARD") // BASIC, STANDARD, PREMIUM
+  aiPrompt     String? // the full prompt sent to AI
+  aiResponse   String? // raw AI response
+  packages     String // JSON: the 3 package options (economy, standard, premium)
+  selectedTier String? // ECONOMY, STANDARD, PREMIUM
+  status       String    @default("DRAFT") // DRAFT, BOOKED, CANCELLED
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
 
   user            User             @relation(fields: [userId], references: [id])
   packageBookings PackageBooking[]
 }
 
 model PackageBooking {
-  id          String     @id @default(cuid())
-  eventPlanId String
-  tier        String     // ECONOMY, STANDARD, PREMIUM
-  totalCost   Float
-  totalDeposit Float     @default(0)
-  savings     Float      @default(0)
-  status      String     @default("PENDING") // PENDING, CONFIRMED, DELIVERED, COMPLETED, CANCELLED
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @updatedAt
+  id           String   @id @default(cuid())
+  eventPlanId  String
+  tier         String // ECONOMY, STANDARD, PREMIUM
+  totalCost    Float
+  totalDeposit Float    @default(0)
+  savings      Float    @default(0)
+  status       String   @default("PENDING") // PENDING, CONFIRMED, DELIVERED, COMPLETED, CANCELLED
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
-  eventPlan   EventPlan      @relation(fields: [eventPlanId], references: [id])
-  items       PackageItem[]
-  bookings    Booking[]
+  eventPlan EventPlan     @relation(fields: [eventPlanId], references: [id])
+  items     PackageItem[]
+  bookings  Booking[]
 }
 
 model PackageItem {
-  id               String  @id @default(cuid())
+  id               String   @id @default(cuid())
   packageBookingId String
   productId        String?
   categoryId       String?
-  productName      String  // fallback name if no product matched
+  productName      String // fallback name if no product matched
   quantity         Int
-  rentPricePerDay  Float   @default(0)
-  buyPrice         Float   @default(0)
-  duration         Int     @default(1) // days
+  rentPricePerDay  Float    @default(0)
+  buyPrice         Float    @default(0)
+  duration         Int      @default(1) // days
   subtotal         Float
   vendorId         String?
   vendorName       String?
-  priority         String  @default("MEDIUM") // HIGH, MEDIUM, LOW
+  priority         String   @default("MEDIUM") // HIGH, MEDIUM, LOW
   reason           String?
   createdAt        DateTime @default(now())
 
