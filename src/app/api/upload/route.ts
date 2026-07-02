@@ -34,19 +34,26 @@ export async function POST(request: Request) {
                 );
             }
 
-            const extension = image.name.split(".").pop() || "jpg";
-            const filePath = `products/${Date.now()}-${crypto.randomUUID()}.${extension}`;
+            const extension = image.name.split(".").pop()?.toLowerCase().replace(/[^a-z0-9]/g, "") || "jpg";
+
+            const safeName = image.name
+                .replace(/\.[^/.]+$/, "")
+                .replace(/[^a-zA-Z0-9-_]/g, "-")
+                .slice(0, 50);
+
+            const filePath = `products/${Date.now()}-${safeName}-${crypto.randomUUID()}.${extension}`;
 
             const buffer = Buffer.from(await image.arrayBuffer());
 
             const { error } = await supabase.storage
                 .from("Product-Images")
                 .upload(filePath, buffer, {
-                    contentType: image.type,
+                    contentType: image.type || "image/jpeg",
                     upsert: false,
                 });
 
             if (error) {
+                console.error("Supabase upload error:", error);
                 return NextResponse.json({ error: error.message }, { status: 500 });
             }
 
