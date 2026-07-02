@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import OpenAI from "openai";
+import { GoogleGenAI } from "@google/genai";
 
-const SYSTEM_PROMPT = `You are RentWise AI Product Description Generator. Given a product name, generate professional listing content.
+const SYSTEM_PROMPT = `You are RentWise AI Product Description Generator.
 
-Always respond in this exact JSON format:
+Return ONLY valid JSON in this exact format:
 {
   "title": "Optimized product title for marketplace",
   "description": "Detailed product description (2-3 paragraphs) suitable for an equipment rental marketplace",
@@ -12,7 +12,7 @@ Always respond in this exact JSON format:
   "shortDescription": "One-line tagline for the product"
 }
 
-Write in a professional, trustworthy tone. Focus on practical benefits for event planners, photographers, and businesses.`;
+Write professionally and focus on practical benefits for event planners, photographers, and businesses.`;
 
 export async function POST(req: NextRequest) {
   try {
@@ -25,61 +25,49 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const apiKey = process.env.ZENMUX_API_KEY;
+    const apiKey = process.env.GEMINI_API_KEY;
 
     if (!apiKey) {
       return NextResponse.json(
-        { error: "ZENMUX_API_KEY is missing in Vercel environment variables" },
+        { error: "GEMINI_API_KEY is missing in Vercel environment variables" },
         { status: 500 }
       );
     }
 
-    const zenmux = new OpenAI({
-      apiKey,
-      baseURL: "https://zenmux.ai/api/v1",
+    const ai = new GoogleGenAI({ apiKey });
+
+    const prompt = `${SYSTEM_PROMPT}
+
+Product name: "${productName}"
+${category ? `Category: "${category}"` : ""}`;
+
+    const response = await ai.models.generateContent({
+      model: "gemini-2.5-flash",
+      contents: prompt,
+      config: {
+        responseMimeType: "application/json",
+      },
     });
 
-    const userMessage = `Generate listing content for: "${productName}"
-${category ? `Category: ${category}` : ""}`;
-
-    const completion = await zenmux.chat.completions.create({
-      model: "anthropic/claude-sonnet-5-free",
-      messages: [
-        { role: "system", content: SYSTEM_PROMPT },
-        { role: "user", content: userMessage },
-      ],
-      temperature: 0.7,
-      response_format: { type: "json_object" },
-    });
-
-    const raw = completion.choices[0]?.message?.content || "";
+    const raw = response.text || "";
 
     let result;
     try {
       result = JSON.parse(raw);
     } catch {
-      result = {
-        title: productName,
-        description: raw,
-        features: [],
-        keywords: [],
-        shortDescription: "",
-      };
+      return NextResponse.json(
+        { error: "Gemini returned invalid JSON", raw },
+        { status: 500 }
+      );
     }
 
     return NextResponse.json(result);
   } catch (error: unknown) {
-    console.error("ZenMux AI error:", error);
-  
+    console.error("Gemini AI error:", error);
+
     const message =
       error instanceof Error ? error.message : "Description generation failed";
-  
-    return NextResponse.json(
-      {
-        error: message,
-        provider: "ZenMux",
-      },
-      { status: 500 }
-    );
+
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
