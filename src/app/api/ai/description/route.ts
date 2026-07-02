@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import ZAI from "z-ai-web-dev-sdk";
+import OpenAI from "openai";
 
 const SYSTEM_PROMPT = `You are RentWise AI Product Description Generator. Given a product name, generate professional listing content.
 
@@ -18,34 +18,62 @@ export async function POST(req: NextRequest) {
   try {
     const { productName, category } = await req.json();
 
-    if (!productName) {
-      return NextResponse.json({ error: "Product name required" }, { status: 400 });
+    if (!productName?.trim()) {
+      return NextResponse.json(
+        { error: "Product name required" },
+        { status: 400 }
+      );
     }
+
+    const apiKey = process.env.ZENMUX_API_KEY;
+
+    if (!apiKey) {
+      return NextResponse.json(
+        { error: "ZENMUX_API_KEY is missing in Vercel environment variables" },
+        { status: 500 }
+      );
+    }
+
+    const zenmux = new OpenAI({
+      apiKey,
+      baseURL: "https://zenmux.ai/api/v1",
+    });
 
     const userMessage = `Generate listing content for: "${productName}"
 ${category ? `Category: ${category}` : ""}`;
 
-    const zai = await ZAI.create();
-    const completion = await zai.chat.completions.create({
+    const completion = await zenmux.chat.completions.create({
+      model: "google/gemini-2.5-flash",
       messages: [
-        { role: "assistant", content: SYSTEM_PROMPT },
+        { role: "system", content: SYSTEM_PROMPT },
         { role: "user", content: userMessage },
       ],
-      thinking: { type: "disabled" },
+      temperature: 0.7,
+      response_format: { type: "json_object" },
     });
 
     const raw = completion.choices[0]?.message?.content || "";
+
     let result;
     try {
-      const jsonMatch = raw.match(/\{[\s\S]*\}/);
-      result = jsonMatch ? JSON.parse(jsonMatch[0]) : { title: productName, description: raw, features: [], keywords: [], shortDescription: "" };
+      result = JSON.parse(raw);
     } catch {
-      result = { title: productName, description: raw, features: [], keywords: [], shortDescription: "" };
+      result = {
+        title: productName,
+        description: raw,
+        features: [],
+        keywords: [],
+        shortDescription: "",
+      };
     }
 
     return NextResponse.json(result);
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : "Description generation failed";
+    console.error("ZenMux description generation error:", error);
+
+    const message =
+      error instanceof Error ? error.message : "Description generation failed";
+
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
