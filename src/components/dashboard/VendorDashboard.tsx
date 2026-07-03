@@ -189,8 +189,20 @@ interface VendorDashboardData {
   monthlyRevenue: Array<{ month: string; revenue: number }>;
 }
 
-function VendorOverviewTab({ data }: { data: VendorDashboardData | null }) {
-  if (!data) return <VendorOverviewSkeleton />;
+function VendorOverviewTab({ data, loading }: { data: VendorDashboardData | null; loading: boolean }) {
+  if (loading) return <VendorOverviewSkeleton />;
+
+  if (!data) {
+    return (
+      <Card>
+        <CardContent className="py-16 text-center">
+          <BarChart3 className="h-10 w-10 mx-auto text-muted-foreground/40 mb-3" />
+          <p className="text-sm font-medium text-muted-foreground">No dashboard data yet</p>
+          <p className="text-xs text-muted-foreground mt-1">Start by adding your first product</p>
+        </CardContent>
+      </Card>
+    );
+  }
 
   const statCards = [
     { icon: <Package className="h-5 w-5" />, value: data.totalProducts, label: "Total Products", color: "text-primary", bg: "bg-primary/10" },
@@ -1189,7 +1201,7 @@ export default function VendorDashboard() {
       const data = await res.json();
       setDashboardData(data);
     } catch {
-      toast.error("Failed to load dashboard data");
+      // Silently fail — overview tab will show empty state, other tabs still work
     } finally {
       setLoading(false);
     }
@@ -1336,7 +1348,7 @@ export default function VendorDashboard() {
         <AnimatePresence mode="wait">
           {vendorTab === "overview" && (
             <TabsContent value="overview">
-              <VendorOverviewTab data={loading ? null : dashboardData} />
+              <VendorOverviewTab data={dashboardData} loading={loading} />
             </TabsContent>
           )}
           {vendorTab === "products" && (

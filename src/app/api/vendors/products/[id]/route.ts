@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { verifyToken, getTokenFromHeader } from "@/lib/auth";
+import { verifyToken, getTokenFromHeader, getOrCreateVendor } from "@/lib/auth";
 
 // Shared helper: authenticate vendor and return vendor record
 async function authenticateVendor(req: NextRequest) {
@@ -9,8 +9,7 @@ async function authenticateVendor(req: NextRequest) {
   const payload = await verifyToken(token);
   if (!payload || payload.role !== "VENDOR") return { error: NextResponse.json({ error: "Vendor access required" }, { status: 403 }) };
 
-  const vendor = await db.vendor.findUnique({ where: { userId: payload.userId } });
-  if (!vendor) return { error: NextResponse.json({ error: "Vendor not found" }, { status: 404 }) };
+  const vendor = await getOrCreateVendor(payload.userId);
 
   return { vendor };
 }

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { verifyToken, getTokenFromHeader } from "@/lib/auth";
+import { verifyToken, getTokenFromHeader, getOrCreateVendor } from "@/lib/auth";
 
 export async function GET(req: NextRequest) {
   try {
@@ -9,8 +9,7 @@ export async function GET(req: NextRequest) {
     const payload = await verifyToken(token);
     if (!payload || payload.role !== "VENDOR") return NextResponse.json({ error: "Vendor access required" }, { status: 403 });
 
-    const vendor = await db.vendor.findUnique({ where: { userId: payload.userId } });
-    if (!vendor) return NextResponse.json({ error: "Vendor not found" }, { status: 404 });
+    const vendor = await getOrCreateVendor(payload.userId);
 
     const { searchParams } = new URL(req.url);
     const status = searchParams.get("status");

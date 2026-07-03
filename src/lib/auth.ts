@@ -1,5 +1,6 @@
 import bcrypt from "bcryptjs";
 import { SignJWT, jwtVerify } from "jose";
+import { db } from "./db";
 
 const JWT_SECRET = new TextEncoder().encode(
   process.env.JWT_SECRET || "rentwise-ai-super-secret-key-2024"
@@ -53,4 +54,19 @@ export function getTokenFromHeader(
     return auth.slice(7);
   }
   return null;
+}
+
+/** Get or auto-create the Vendor profile for a VENDOR-role user. */
+export async function getOrCreateVendor(userId: string) {
+  let vendor = await db.vendor.findUnique({ where: { userId } });
+  if (!vendor) {
+    const user = await db.user.findUnique({ where: { id: userId }, select: { name: true } });
+    vendor = await db.vendor.create({
+      data: {
+        userId,
+        businessName: user?.name ? `${user.name}'s Equipment` : "My Equipment Business",
+      },
+    });
+  }
+  return vendor;
 }

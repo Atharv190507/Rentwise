@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { verifyToken, getTokenFromHeader } from "@/lib/auth";
+import { verifyToken, getTokenFromHeader, getOrCreateVendor } from "@/lib/auth";
 
 export async function GET(req: NextRequest) {
   try {
@@ -9,8 +9,7 @@ export async function GET(req: NextRequest) {
     const payload = await verifyToken(token);
     if (!payload || payload.role !== "VENDOR") return NextResponse.json({ error: "Vendor access required" }, { status: 403 });
 
-    const vendor = await db.vendor.findUnique({ where: { userId: payload.userId } });
-    if (!vendor) return NextResponse.json({ error: "Vendor profile not found" }, { status: 404 });
+    const vendor = await getOrCreateVendor(payload.userId);
 
     const [totalProducts, activeBookings, completedBookings, totalRevenue, pendingBookings] = await Promise.all([
       db.product.count({ where: { vendorId: vendor.id } }),
@@ -21,7 +20,7 @@ export async function GET(req: NextRequest) {
     ]);
 
     // Monthly revenue for chart
-    const monthlyRevenue = await db.$queryRaw<Array<{ month: string; total: number }>>`
+    const monthlyRevenueRaw = await db.$queryRaw<Array<{ month: string; total: number }>>`
       SELECT strftime('%Y-%m', createdAt) as month, SUM(totalPrice) as total
       FROM Booking
       WHERE productId IN (SELECT id FROM Product WHERE vendorId = ${vendor.id})
@@ -31,10 +30,31 @@ export async function GET(req: NextRequest) {
       LIMIT 6
     `;
 
+    const monthlyRevenue = monthlyRevenueRaw.map((r) => ({
+      month: r.month,
+      revenue: r.total,
+    }));
+
     // Top products
-    const topProducts = await db.product.findMany({
+    const topProductsRaw = await db.product.findMany({
       where: { vendorId: vendor.id },
-      select: { id: true, title: true, stock: true, status: true, _count: { select: { bookings: true } } },
+      select: { title: true, _count: { select: { bookings: true } } },
+      orderBy: { createdAt: "desc" },
+      take: 5,
+    });
+
+    const topProducts = topProductsRaw.map((p) => ({
+      name: p.title,
+      bookingCount: p._count.bookings,
+    }));
+
+    // Recent bookings
+    const recentBookings = await db.booking.findMany({
+      where: { product: { vendorId: vendor.id } },
+      include: {
+        user: { select: { name: true } },
+        product: { select: { title: true } },
+      },
       orderBy: { createdAt: "desc" },
       take: 5,
     });
@@ -42,11 +62,12 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({
       totalProducts,
       activeBookings,
-      completedBookings,
+      pendingApprovals: pendingBookings,
+      completedOrders: completedBookings,
       totalRevenue: totalRevenue._sum.totalPrice || 0,
-      pendingBookings,
-      monthlyRevenue,
+      recentBookings,
       topProducts,
+      monthlyRevenue,
     });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : "Failed to fetch vendor stats";
