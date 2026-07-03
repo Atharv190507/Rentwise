@@ -1,59 +1,92 @@
 import { NextRequest, NextResponse } from "next/server";
-import ZAI from "z-ai-web-dev-sdk";
+import { GoogleGenAI } from "@google/genai";
 
-const SYSTEM_PROMPT = `You are RentWise AI Event Planner. Given an event description, recommend all equipment needed with quantities and estimated costs. 
+const SYSTEM_PROMPT = `You are RentWise AI Event Planner.
 
-Always respond in this exact JSON format:
+Given an event description, create a practical equipment recommendation plan for an equipment rental marketplace.
+
+Return ONLY valid JSON in exactly this format:
 {
-  "summary": "Brief overview of the event setup",
-  "equipment": [
-    { "name": "Equipment name", "quantity": <number>, "rentPerDay": <number>, "totalDays": <number>, "totalCost": <number>, "reason": "Why this is needed" }
+  "eventTitle": "Short event title",
+  "summary": "Short summary of the event requirements",
+  "recommendedItems": [
+    {
+      "name": "Equipment name",
+      "quantity": 1,
+      "reason": "Why this equipment is needed"
+    }
   ],
-  "totalEstimatedCost": <number>,
-  "tips": ["Helpful tip 1", "Helpful tip 2"]
+  "tips": [
+    "Helpful planning tip 1",
+    "Helpful planning tip 2",
+    "Helpful planning tip 3"
+  ]
 }
 
-Consider:
-- Number of attendees for speaker/audio sizing
-- Indoor/outdoor for tent/lighting needs
-- Event type for decoration and stage
-- Always provide realistic quantities and pricing in INR (₹)`;
+Recommend suitable items such as speakers, microphones, LED screens, projectors, cameras, lights, chairs, tables, decoration equipment, generators, and staging equipment.`;
 
 export async function POST(req: NextRequest) {
   try {
-    const { eventDescription, attendees, budget } = await req.json();
+    const body = await req.json();
 
-    if (!eventDescription) {
-      return NextResponse.json({ error: "Event description required" }, { status: 400 });
+    const eventDescription =
+      body.eventDescription ||
+      body.description ||
+      body.event ||
+      "";
+
+    if (!eventDescription.trim()) {
+      return NextResponse.json(
+        { error: "Event description is required" },
+        { status: 400 }
+      );
     }
 
-    const userMessage = `Event: ${eventDescription}
-${attendees ? `Attendees: ${attendees}` : ""}
-${budget ? `Budget: ₹${Number(budget).toLocaleString("en-IN")}` : ""}
+    const apiKey = process.env.GEMINI_API_KEY;
 
-Plan the complete equipment setup for this event.`;
+    if (!apiKey) {
+      return NextResponse.json(
+        { error: "GEMINI_API_KEY is missing in Vercel environment variables" },
+        { status: 500 }
+      );
+    }
 
-    const zai = await ZAI.create();
-    const completion = await zai.chat.completions.create({
-      messages: [
-        { role: "assistant", content: SYSTEM_PROMPT },
-        { role: "user", content: userMessage },
-      ],
-      thinking: { type: "disabled" },
+    const ai = new GoogleGenAI({ apiKey });
+
+    const response = await ai.models.generateContent({
+      model: "gemini-2.5-flash",
+      contents: `${SYSTEM_PROMPT}
+
+Event description:
+"${eventDescription}"`,
+      config: {
+        responseMimeType: "application/json",
+      },
     });
 
-    const raw = completion.choices[0]?.message?.content || "";
-    let result;
-    try {
-      const jsonMatch = raw.match(/\{[\s\S]*\}/);
-      result = jsonMatch ? JSON.parse(jsonMatch[0]) : { summary: raw, equipment: [], totalEstimatedCost: 0, tips: [] };
-    } catch {
-      result = { summary: raw, equipment: [], totalEstimatedCost: 0, tips: [] };
-    }
+    const raw = response.text || "";
 
-    return NextResponse.json(result);
+    try {
+      return NextResponse.json(JSON.parse(raw));
+    } catch {
+      console.error("Gemini returned invalid JSON:", raw);
+
+      return NextResponse.json(
+        { error: "Gemini returned invalid event plan data" },
+        { status: 500 }
+      );
+    }
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : "Event planning failed";
-    return NextResponse.json({ error: message }, { status: 500 });
+    console.error("Gemini Event Planner error:", error);
+
+    return NextResponse.json(
+      {
+        error:
+          error instanceof Error
+            ? error.message
+            : "Failed to generate event plan",
+      },
+      { status: 500 }
+    );
   }
 }

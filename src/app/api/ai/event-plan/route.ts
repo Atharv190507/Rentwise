@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { GoogleGenAI } from "@google/genai";
 import { db } from "@/lib/db";
 import { verifyToken, getTokenFromHeader } from "@/lib/auth";
 
@@ -12,38 +13,57 @@ CRITICAL RULES:
 - Respect stock availability - don't recommend more than available stock
 - Group items by priority: HIGH (essential), MEDIUM (recommended), LOW (nice-to-have)
 
-Respond in this exact JSON format:
+Respond ONLY with valid JSON in this exact structure:
 {
   "packages": {
     "economy": {
       "tier": "ECONOMY",
       "name": "Economy Package",
       "description": "Brief description",
-      "totalCost": <number>,
-      "totalDeposit": <number>,
+      "totalCost": 0,
+      "totalDeposit": 0,
       "items": [
         {
-          "productId": "<must match an inventory product id>",
+          "productId": "inventory product id",
           "productName": "Display name",
           "category": "Category name",
-          "quantity": <number>,
-          "rentPerDay": <number>,
-          "duration": <number>,
-          "subtotal": <number>,
-          "deposit": <number>,
-          "vendorId": "<from inventory>",
-          "vendorName": "<from inventory>",
-          "vendorRating": <number>,
-          "priority": "HIGH|MEDIUM|LOW",
+          "quantity": 1,
+          "rentPerDay": 0,
+          "duration": 1,
+          "subtotal": 0,
+          "deposit": 0,
+          "vendorId": "vendor id",
+          "vendorName": "vendor name",
+          "vendorRating": 0,
+          "priority": "HIGH",
           "reason": "Why this is included"
         }
       ]
     },
-    "standard": { ... same structure ... },
-    "premium": { ... same structure ... }
+    "standard": {
+      "tier": "STANDARD",
+      "name": "Standard Package",
+      "description": "Brief description",
+      "totalCost": 0,
+      "totalDeposit": 0,
+      "items": []
+    },
+    "premium": {
+      "tier": "PREMIUM",
+      "name": "Premium Package",
+      "description": "Brief description",
+      "totalCost": 0,
+      "totalDeposit": 0,
+      "items": []
+    }
   },
   "upsells": [
-    { "name": "Photo Booth", "reason": "Popular add-on", "estimatedCost": 5000, "category": "Photography" }
+    {
+      "name": "Photo Booth",
+      "reason": "Popular add-on",
+      "estimatedCost": 5000,
+      "category": "Photography"
+    }
   ],
   "tips": ["Tip 1", "Tip 2", "Tip 3"]
 }`;
@@ -59,7 +79,12 @@ function buildInventoryPrompt(
     stock: number;
     condition: string;
     location: string | null;
-    vendor: { id: string; businessName: string; isVerified: boolean; rating: number };
+    vendor: {
+      id: string;
+      businessName: string;
+      isVerified: boolean;
+      rating: number;
+    };
     category: { id: string; name: string; slug: string };
     reviews: { rating: number }[];
   }[]
@@ -68,12 +93,26 @@ function buildInventoryPrompt(
     return "No products available in inventory.";
   }
 
-  const lines = products.map((p, idx) => {
-    const avgRating =
+  const lines = products.map((p, index) => {
+    const averageRating =
       p.reviews.length > 0
-        ? (p.reviews.reduce((sum, r) => sum + r.rating, 0) / p.reviews.length).toFixed(1)
+        ? (
+            p.reviews.reduce((sum, review) => sum + review.rating, 0) /
+            p.reviews.length
+          ).toFixed(1)
         : "N/A";
-    return `[${idx + 1}] ID: "${p.id}" | Title: "${p.title}" | Category: "${p.category.name}" | BuyPrice: ₹${p.buyPrice} | RentPerDay: ₹${p.rentPricePerDay} | Deposit: ₹${p.deposit} | Stock: ${p.stock} | Condition: ${p.condition} | Location: ${p.location || "N/A"} | VendorID: "${p.vendor.id}" | VendorName: "${p.vendor.businessName}" | VendorVerified: ${p.vendor.isVerified} | VendorRating: ${p.vendor.rating} | AvgProductRating: ${avgRating}`;
+
+    return `[${index + 1}] ID: "${p.id}" | Title: "${p.title}" | Category: "${
+      p.category.name
+    }" | BuyPrice: ₹${p.buyPrice} | RentPerDay: ₹${
+      p.rentPricePerDay
+    } | Deposit: ₹${p.deposit} | Stock: ${p.stock} | Condition: ${
+      p.condition
+    } | Location: ${p.location || "N/A"} | VendorID: "${
+      p.vendor.id
+    }" | VendorName: "${p.vendor.businessName}" | VendorVerified: ${
+      p.vendor.isVerified
+    } | VendorRating: ${p.vendor.rating} | AvgProductRating: ${averageRating}`;
   });
 
   return `AVAILABLE INVENTORY (${products.length} products):
@@ -87,16 +126,16 @@ function validatePackagesAgainstInventory(
   const tiers = ["economy", "standard", "premium"] as const;
 
   for (const tier of tiers) {
-    const pkg = packages[tier] as Record<string, unknown> | undefined;
-    if (!pkg) continue;
+    const packageData = packages[tier] as Record<string, unknown> | undefined;
+    if (!packageData) continue;
 
-    const items = pkg.items as Array<Record<string, unknown>> | undefined;
+    const items = packageData.items as Array<Record<string, unknown>> | undefined;
     if (!items) continue;
 
     for (const item of items) {
       const productId = item.productId as string | undefined;
+
       if (productId && !validProductIds.has(productId)) {
-        // Remove invalid product references but keep the item info
         item.productId = null;
         item.reason = `${item.reason || "Included"} (product unavailable)`;
       }
@@ -106,19 +145,26 @@ function validatePackagesAgainstInventory(
 
 export async function POST(req: NextRequest) {
   try {
-    // 1. Authenticate user
     const token = getTokenFromHeader(req);
+
     if (!token) {
-      return NextResponse.json({ error: "Authentication required" }, { status: 401 });
+      return NextResponse.json(
+        { error: "Authentication required" },
+        { status: 401 }
+      );
     }
 
     const payload = await verifyToken(token);
+
     if (!payload) {
-      return NextResponse.json({ error: "Invalid or expired token" }, { status: 401 });
+      return NextResponse.json(
+        { error: "Invalid or expired token" },
+        { status: 401 }
+      );
     }
 
-    // 2. Parse request body
     const body = await req.json();
+
     const {
       eventType,
       guests,
@@ -139,19 +185,34 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 3. Fetch all available products
     const products = await db.product.findMany({
       where: { status: "AVAILABLE" },
       include: {
-        vendor: { select: { id: true, businessName: true, isVerified: true, rating: true } },
-        category: { select: { id: true, name: true, slug: true } },
-        reviews: { select: { rating: true } },
+        vendor: {
+          select: {
+            id: true,
+            businessName: true,
+            isVerified: true,
+            rating: true,
+          },
+        },
+        category: {
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+          },
+        },
+        reviews: {
+          select: {
+            rating: true,
+          },
+        },
       },
     });
 
-    // 4. Build the AI prompt
     const inventoryPrompt = buildInventoryPrompt(products);
-    const validProductIds = new Set(products.map((p) => p.id));
+    const validProductIds = new Set(products.map((product) => product.id));
 
     const userMessage = `EVENT DETAILS:
 - Event Type: ${eventType}
@@ -168,29 +229,36 @@ export async function POST(req: NextRequest) {
 ${inventoryPrompt}
 
 Create 3 equipment packages (ECONOMY, STANDARD, PREMIUM) for this event using ONLY the products from the inventory above.
-- ECONOMY: Minimize cost, essential items only, stay well within budget
-- STANDARD: Good balance of quality and cost, include recommended items
-- PREMIUM: Best quality equipment, full setup, can go up to 20% over budget
-- Calculate all costs as rentPerDay × ${duration} (duration) days
-- Respect stock limits - do not recommend more than available stock`;
 
-    const fullPrompt = `${SYSTEM_PROMPT}\n\n${userMessage}`;
+- ECONOMY: Minimize cost, essential items only, stay well within budget.
+- STANDARD: Good balance of quality and cost, include recommended items.
+- PREMIUM: Best quality equipment, full setup, can go up to 20% over budget.
+- Calculate all costs as rentPerDay × ${duration} days.
+- Respect stock limits.`;
 
-    // 5. Call AI (lazy import to avoid Turbopack compilation issues)
-    const zaiSdk = await import("z-ai-web-dev-sdk");
-    const ZAI = zaiSdk.default;
-    const zai = await ZAI.create();
-    const completion = await zai.chat.completions.create({
-      messages: [
-        { role: "assistant", content: SYSTEM_PROMPT },
-        { role: "user", content: userMessage },
-      ],
-      thinking: { type: "disabled" },
+    const apiKey = process.env.GEMINI_API_KEY;
+
+    if (!apiKey) {
+      return NextResponse.json(
+        { error: "GEMINI_API_KEY is missing in Vercel environment variables" },
+        { status: 500 }
+      );
+    }
+
+    const ai = new GoogleGenAI({ apiKey });
+
+    const response = await ai.models.generateContent({
+      model: "gemini-2.5-flash",
+      contents: `${SYSTEM_PROMPT}
+
+${userMessage}`,
+      config: {
+        responseMimeType: "application/json",
+      },
     });
 
-    const rawAIResponse = completion.choices[0]?.message?.content || "";
+    const rawAIResponse = response.text || "";
 
-    // 6. Parse AI response
     let parsedPackages: Record<string, unknown> = {
       packages: { economy: {}, standard: {}, premium: {} },
       upsells: [],
@@ -198,20 +266,15 @@ Create 3 equipment packages (ECONOMY, STANDARD, PREMIUM) for this event using ON
     };
 
     try {
-      const jsonMatch = rawAIResponse.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        parsedPackages = JSON.parse(jsonMatch[0]);
-      }
+      parsedPackages = JSON.parse(rawAIResponse);
     } catch {
-      // Fallback: return raw response as tips
       parsedPackages = {
         packages: { economy: {}, standard: {}, premium: {} },
         upsells: [],
-        tips: [rawAIResponse],
+        tips: [rawAIResponse || "AI returned an invalid response."],
       };
     }
 
-    // 7. Validate product IDs against inventory
     if (parsedPackages.packages) {
       validatePackagesAgainstInventory(
         parsedPackages.packages as Record<string, unknown>,
@@ -219,7 +282,6 @@ Create 3 equipment packages (ECONOMY, STANDARD, PREMIUM) for this event using ON
       );
     }
 
-    // 8. Save to EventPlan table
     const eventPlan = await db.eventPlan.create({
       data: {
         userId: payload.userId,
@@ -233,13 +295,12 @@ Create 3 equipment packages (ECONOMY, STANDARD, PREMIUM) for this event using ON
         requirements: requirements || null,
         preference,
         quality,
-        aiPrompt: fullPrompt,
+        aiPrompt: `${SYSTEM_PROMPT}\n\n${userMessage}`,
         aiResponse: rawAIResponse,
         packages: JSON.stringify(parsedPackages),
       },
     });
 
-    // 9. Return response
     return NextResponse.json({
       id: eventPlan.id,
       eventType: eventPlan.eventType,
@@ -251,7 +312,14 @@ Create 3 equipment packages (ECONOMY, STANDARD, PREMIUM) for this event using ON
       tips: parsedPackages.tips || [],
     });
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : "AI event planning failed";
-    return NextResponse.json({ error: message }, { status: 500 });
+    console.error("Gemini Event Plan error:", error);
+
+    return NextResponse.json(
+      {
+        error:
+          error instanceof Error ? error.message : "AI event planning failed",
+      },
+      { status: 500 }
+    );
   }
 }
