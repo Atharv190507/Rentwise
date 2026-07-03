@@ -1289,16 +1289,14 @@ export default function VendorDashboard() {
 
   return (
     <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-        <div>
-          <h2 className="text-2xl font-bold tracking-tight">Vendor Dashboard</h2>
-          <p className="text-sm text-muted-foreground mt-1">Manage your products, bookings, and track your business performance</p>
-        </div>
+      <div className="text-center space-y-3">
+        <h2 className="text-2xl font-bold tracking-tight">Vendor Dashboard</h2>
+        <p className="text-sm text-muted-foreground">Manage your products, bookings, and track your business performance</p>
         <Button
           variant="outline"
           size="sm"
           onClick={() => navigateTo("marketplace")}
-          className="gap-2 rounded-full self-start"
+          className="gap-2 rounded-full"
         >
           <ArrowLeft className="h-4 w-4" />
           Back to Marketplace
@@ -1310,28 +1308,30 @@ export default function VendorDashboard() {
         onValueChange={(v) => setVendorTab(v as typeof vendorTab)}
         className="w-full"
       >
-        <TabsList className="flex-wrap h-auto gap-1 p-1">
-          <TabsTrigger value="overview" className="text-xs sm:text-sm">
-            <Eye className="h-3.5 w-3.5 sm:mr-1.5" />
-            <span className="hidden sm:inline">Overview</span>
-          </TabsTrigger>
-          <TabsTrigger value="products" className="text-xs sm:text-sm">
-            <Package className="h-3.5 w-3.5 sm:mr-1.5" />
-            <span className="hidden sm:inline">Products</span>
-          </TabsTrigger>
-          <TabsTrigger value="bookings" className="text-xs sm:text-sm">
-            <Calendar className="h-3.5 w-3.5 sm:mr-1.5" />
-            <span className="hidden sm:inline">Bookings</span>
-          </TabsTrigger>
-          <TabsTrigger value="add-product" className="text-xs sm:text-sm">
-            <Plus className="h-3.5 w-3.5 sm:mr-1.5" />
-            <span className="hidden sm:inline">Add Product</span>
-          </TabsTrigger>
-          <TabsTrigger value="analytics" className="text-xs sm:text-sm">
-            <BarChart3 className="h-3.5 w-3.5 sm:mr-1.5" />
-            <span className="hidden sm:inline">Analytics</span>
-          </TabsTrigger>
-        </TabsList>
+        <div className="flex justify-center">
+          <TabsList className="flex-wrap h-auto gap-1 p-1">
+            <TabsTrigger value="overview" className="text-xs sm:text-sm">
+              <Eye className="h-3.5 w-3.5 sm:mr-1.5" />
+              <span className="hidden sm:inline">Overview</span>
+            </TabsTrigger>
+            <TabsTrigger value="products" className="text-xs sm:text-sm">
+              <Package className="h-3.5 w-3.5 sm:mr-1.5" />
+              <span className="hidden sm:inline">Products</span>
+            </TabsTrigger>
+            <TabsTrigger value="bookings" className="text-xs sm:text-sm">
+              <Calendar className="h-3.5 w-3.5 sm:mr-1.5" />
+              <span className="hidden sm:inline">Bookings</span>
+            </TabsTrigger>
+            <TabsTrigger value="add-product" className="text-xs sm:text-sm">
+              <Plus className="h-3.5 w-3.5 sm:mr-1.5" />
+              <span className="hidden sm:inline">Add Product</span>
+            </TabsTrigger>
+            <TabsTrigger value="analytics" className="text-xs sm:text-sm">
+              <BarChart3 className="h-3.5 w-3.5 sm:mr-1.5" />
+              <span className="hidden sm:inline">Analytics</span>
+            </TabsTrigger>
+          </TabsList>
+        </div>
 
         <AnimatePresence mode="wait">
           {vendorTab === "overview" && (
