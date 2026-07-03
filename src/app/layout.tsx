@@ -15,10 +15,17 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "RentWise AI — Rent it. Buy it. Book it. Let AI decide.",
-  description: "AI-powered Rental + Booking + Buy Marketplace for event equipment. Smart recommendations, best prices, premium experience.",
+  title: "RentWise AI",
+  description: "Smart Equipment Rental Marketplace",
   icons: {
-    icon: "https://z-cdn.chatglm.cn/z-ai/static/logo.svg",
+    icon: [
+      {
+        url: "/logo.svg?v=3",
+        type: "image/svg+xml",
+      },
+    ],
+    shortcut: "/logo.svg?v=3",
+    apple: "/logo.svg?v=3",
   },
 };
 
