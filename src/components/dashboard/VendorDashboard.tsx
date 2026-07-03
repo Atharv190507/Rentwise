@@ -383,16 +383,18 @@ function VendorProductsTab({ products, loading, onAddProduct, onEditProduct, onT
               })()}
               <button
                 onClick={() => onToggleStatus(p)}
-                className={`absolute top-2 right-2 text-[10px] cursor-pointer ${p.status === "AVAILABLE"
+                className={`absolute top-2 right-2 text-[10px] cursor-pointer ${
+                  p.status === "AVAILABLE"
                     ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400"
                     : "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400"
-                  }`}
+                }`}
               >
                 <Badge
-                  className={`text-[10px] cursor-pointer ${p.status === "AVAILABLE"
+                  className={`text-[10px] cursor-pointer ${
+                    p.status === "AVAILABLE"
                       ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400"
                       : "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400"
-                    }`}
+                  }`}
                 >
                   {p.status}
                 </Badge>
@@ -636,7 +638,7 @@ function AddProductTab({ categories, onSubmitted, editingProduct }: {
   };
 
   return (
-    <motion.div {...tabAnimation} className="max-w-2xl">
+    <motion.div {...tabAnimation} className="max-w-3xl mx-auto">
       <Card>
         <CardHeader>
           <CardTitle className="text-base">{isEditing ? "Edit Product" : "Add New Product"}</CardTitle>
@@ -790,10 +792,11 @@ function AddProductTab({ categories, onSubmitted, editingProduct }: {
               {/* Upload Area */}
               {uploadedImages.length < 6 && (
                 <label
-                  className={`flex flex-col items-center justify-center gap-2 w-full h-32 rounded-xl border-2 border-dashed cursor-pointer transition-colors ${uploading
+                  className={`flex flex-col items-center justify-center gap-2 w-full h-32 rounded-xl border-2 border-dashed cursor-pointer transition-colors ${
+                    uploading
                       ? "border-primary/50 bg-primary/5 opacity-60"
                       : "border-muted-foreground/25 hover:border-primary/50 hover:bg-primary/5"
-                    }`}
+                  }`}
                 >
                   <input
                     type="file"
@@ -1232,7 +1235,7 @@ export default function VendorDashboard() {
     fetch("/api/categories")
       .then((r) => r.json())
       .then((data) => setCategories(Array.isArray(data) ? data : data.categories || []))
-      .catch(() => { });
+      .catch(() => {});
   }, [fetchDashboard]);
 
   useEffect(() => {
