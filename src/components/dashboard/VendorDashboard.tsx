@@ -1289,18 +1289,18 @@ export default function VendorDashboard() {
 
   return (
     <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 space-y-6">
-      <div className="text-center space-y-3">
-        <h2 className="text-2xl font-bold tracking-tight">Vendor Dashboard</h2>
-        <p className="text-sm text-muted-foreground">Manage your products, bookings, and track your business performance</p>
+      <div className="relative text-center space-y-3 pb-2">
         <Button
-          variant="outline"
+          variant="ghost"
           size="sm"
           onClick={() => navigateTo("marketplace")}
-          className="gap-2 rounded-full"
+          className="absolute left-0 top-0 gap-2 -translate-y-1"
         >
           <ArrowLeft className="h-4 w-4" />
           Back to Marketplace
         </Button>
+        <h2 className="text-2xl font-bold tracking-tight">Vendor Dashboard</h2>
+        <p className="text-sm text-muted-foreground">Manage your products, bookings, and track your business performance</p>
       </div>
 
       <Tabs
